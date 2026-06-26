@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RK Clinic - Healthcare Management Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js CDN for interactive visual analysis -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Left Fixed Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-hims">HIMS</div>
+        <div class="sidebar-logo-container">
+          <span class="sidebar-logo-desc">Hospital Information</span>
+          <span class="sidebar-logo-desc" style="color: var(--text-secondary);">Management System</span>
+        </div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div class="sidebar-nav-group">Main Menu</div>
+        <div class="nav-item active" data-panel="dashboard">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-item" data-panel="patient-management">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>EMR</span>
+        </div>
+        <div class="nav-item" data-panel="opd-management">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          <span>OPD</span>
+        </div>
+        <div class="nav-item" data-panel="patient-registration">
+          <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+          <span>Patient Registration</span>
+        </div>
+        <div class="nav-item" data-panel="ipd-management">
+          <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>RAD Diagnostic</span>
+        </div>
+        <div class="nav-item" data-panel="pharmacy">
+          <svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.25-2.5 3-2.5 4.5h20c0-1.5-1-3.25-2.5-4.5"/><ellipse cx="12" cy="10" rx="7" ry="6"/><path d="M12 4v12"/></svg>
+          <span>Pharmacy</span>
+        </div>
+        <div class="nav-item" data-panel="billing">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/></svg>
+          <span>Insurance</span>
+        </div>
+        <div class="nav-item" data-panel="drug-inventory">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <span>Store</span>
+        </div>
+        <div class="nav-item" data-panel="nursing-notes">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span>Sterilization</span>
+        </div>
+        <div class="nav-item" data-panel="reports-analytics">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Reports</span>
+        </div>
+        <div class="nav-item" data-panel="billing">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>Billing</span>
+        </div>
+        
+        <div class="sidebar-nav-group">Configuration & Setups</div>
+        <div class="nav-item" data-panel="settings" style="justify-content: space-between;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            <span>Hospital</span>
+          </div>
+          <svg style="width:12px; height:12px;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="nav-item" data-panel="settings" style="justify-content: space-between;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Employee</span>
+          </div>
+          <svg style="width:12px; height:12px;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="nav-item" data-panel="settings" style="justify-content: space-between;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>EMR</span>
+          </div>
+          <svg style="width:12px; height:12px;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="nav-item" data-panel="appointments">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Scheduler</span>
+        </div>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <div class="theme-switch-container">
+          <button class="theme-switch-btn active" id="theme-light-btn">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            Light
+          </button>
+          <button class="theme-switch-btn" id="theme-dark-btn">
+            <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            Dark
+          </button>
+        </div>
+        <div class="sidebar-copyright">© 2026. ONASI - V 2.1.11</div>
+      </div>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-left">
+          <button class="hamburger-btn" id="hamburger-btn">
+            <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div class="search-bar-container">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" class="search-input" id="global-search" placeholder="Search anything here...">
+          </div>
+        </div>
+        
+        <div class="header-right">
+          <!-- Quick Actions dropdown to preserve original action items space-efficiently -->
+          <div style="position: relative;">
+            <button class="btn btn-secondary btn-sm" id="quick-actions-btn" style="padding: 6px 12px; font-size:12px; font-weight:700;">
+              <span>Quick Actions</span>
+              <svg style="width:12px; height:12px;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div id="quick-actions-dropdown" class="panel-card" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 200px; padding: 8px; gap: 4px; z-index: 100; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); background-color: var(--bg-surface);">
+              <button class="btn btn-secondary btn-sm" id="action-new-patient" style="justify-content: flex-start; width: 100%; border: none; font-size:12px;">New Patient</button>
+              <button class="btn btn-secondary btn-sm" id="action-new-prescription" style="justify-content: flex-start; width: 100%; border: none; font-size:12px;">New Prescription</button>
+              <button class="btn btn-secondary btn-sm" id="action-new-billing" style="justify-content: flex-start; width: 100%; border: none; font-size:12px;">New Billing Entry</button>
+              <button class="btn btn-secondary btn-sm" id="action-add-medicine" style="justify-content: flex-start; width: 100%; border: none; font-size:12px;">Add Medicine</button>
+            </div>
+          </div>
+
+          <button class="notification-bell-btn" id="notif-btn">
+            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notification-badge" id="notif-count" style="background-color: var(--primary);">2</span>
+          </button>
+          
+          <div class="user-profile-menu">
+            <img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=150&auto=format&fit=crop" alt="Dr. Aditya Avatar" class="user-avatar">
+            <div class="user-info">
+              <span class="user-name">Abdul Kareem</span>
+            </div>
+            <svg style="width:14px; height:14px; margin-left:4px; stroke: var(--text-secondary); fill: none; stroke-width: 2.5;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+      </header>
+      
+      <!-- Content Body -->
+      <div class="content-body">
+        
+        <!-- MODULE: DASHBOARD -->
+        <section class="content-panel active" id="panel-dashboard">
+          
+          <!-- Welcome Section -->
+          <div class="welcome-section" style="margin-bottom: 20px;">
+            <div class="welcome-text">
+              <h1 id="welcome-message" style="font-size: 26px; font-weight: 700; color: var(--text-primary);">Welcome back, Abdul Kareem</h1>
+              <p id="today-date-text" style="font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-top: 2px;">Tuesday • 08 August, 2023</p>
+            </div>
+          </div>
+          
+          <!-- HIMS Top Cards Row -->
+          <div class="hims-dashboard-grid">
+            <!-- COLUMN 1: DENTAL STATS -->
+            <div class="hims-col-3" style="display: flex; flex-direction: column;">
+              <div class="hims-green-card">
+                <div class="hims-green-card-icon">
+                  <!-- Tooth Outline Icon using SVG paths -->
+                  <svg viewBox="0 0 24 24"><path d="M12 2c-.6 0-1.1.2-1.5.5C10 2.8 8 5.3 8 7c0 .6.4 1 1 1s1-.4 1-1c0-.9 1.1-2.9 2-3.5.9.6 2 2.6 2 3.5 0 .6.4 1 1 1s1-.4 1-1c0-1.7-2-4.2-2.5-4.5-.4-.3-.9-.5-1.5-.5zM8 9c-2.2 0-4 1.8-4 4 0 2.8 1.5 5 4 6.5.6.3 1.2.5 1.8.5.5 0 .9-.3 1.1-.7l1.1-2.3 1.1 2.3c.2.4.6.7 1.1.7.6 0 1.2-.2 1.8-.5 2.5-1.5 4-3.7 4-6.5 0-2.2-1.8-4-4-4H8zm0 2h8c1.1 0 2 .9 2 2 0 1.9-1 3.4-2.8 4.5-.4.2-.8.3-1.2.3-.3 0-.6-.2-.7-.5L12 14.5l-1.3 2.8c-.1.3-.4.5-.7.5-.4 0-.8-.1-1.2-.3C7 16.4 6 14.9 6 13c0-1.1.9-2 2-2z"/></svg>
+                </div>
+                <div class="hims-green-card-num" id="hims-procedures-count">15813</div>
+                <div class="hims-green-card-title">Dental Procedures</div>
+                <div class="hims-green-card-footer">
+                  <span class="hims-green-card-revenue">This year revenue<br><strong style="font-size:12px;">SAR 612,839.00</strong></span>
+                  <span class="hims-green-card-trend">
+                    <span>16%</span>
+                    <svg viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                  </span>
+                </div>
+              </div>
+              
+              <div class="hims-mini-cards-row">
+                <div class="hims-mini-card">
+                  <span class="hims-mini-card-num" id="hims-visits-count">62</span>
+                  <span class="hims-mini-card-label">Total Visits</span>
+                  <span class="hims-mini-card-sub">Last month</span>
+                </div>
+                <div class="hims-mini-card">
+                  <span class="hims-mini-card-num" id="hims-prescribed-count">21</span>
+                  <span class="hims-mini-card-label">Prescribed</span>
+                  <span class="hims-mini-card-sub">August 2023</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- COLUMN 2: TOTAL PATIENTS CHART -->
+            <div class="hims-col-5">
+              <div class="hims-chart-card">
+                <div class="hims-card-header-flex">
+                  <div>
+                    <div class="hims-card-title">Total Patients</div>
+                    <div class="hims-card-num-large" id="hims-total-patients-num">26710</div>
+                  </div>
+                  <select class="form-control" style="width: auto; padding: 4px 28px 4px 12px; font-size:11px; font-weight:700; height: max-content; margin:0;" id="hims-chart-range">
+                    <option value="year">This year</option>
+                    <option value="month">This month</option>
+                  </select>
+                </div>
+                <div class="hims-chart-legend">
+                  <div class="hims-legend-item">
+                    <span class="hims-legend-dot male"></span>
+                    <span>Male (1240)</span>
+                  </div>
+                  <div class="hims-legend-item">
+                    <span class="hims-legend-dot female"></span>
+                    <span>Female (1431)</span>
+                  </div>
+                </div>
+                <div style="flex:1; position:relative; min-height: 180px;">
+                  <canvas id="himsTotalPatientsChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- COLUMN 3: CALENDAR -->
+            <div class="hims-col-4">
+              <div class="hims-calendar-card">
+                <div class="hims-calendar-header">
+                  <h3 style="font-size:13px; font-weight:700; color:var(--text-primary);">Calendar</h3>
+                  <button class="btn btn-primary btn-sm" style="padding: 4px 10px; font-size:10px; background-color: var(--primary);" onclick="document.getElementById('dialog-register-patient').showModal()">Add New</button>
+                </div>
+                
+                <div class="hims-calendar-header" style="margin-bottom:6px;">
+                  <span style="font-size:11px; font-weight:700; color:var(--text-primary);" id="hims-calendar-month-year">August 2023</span>
+                  <div class="hims-calendar-nav">
+                    <button class="hims-calendar-nav-btn" id="hims-calendar-prev">
+                      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <button class="hims-calendar-nav-btn" id="hims-calendar-next">
+                      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="hims-calendar-grid" id="hims-calendar-grid-container">
+                  <!-- Generated dynamically -->
+                </div>
+
+                <div class="hims-calendar-legends">
+                  <div class="hims-calendar-legend-item">
+                    <span class="hims-calendar-legend-dot appointment"></span>
+                    <span>Appointment</span>
+                  </div>
+                  <div class="hims-calendar-legend-item">
+                    <span class="hims-calendar-legend-dot meeting"></span>
+                    <span>Meeting</span>
+                  </div>
+                  <div class="hims-calendar-legend-item">
+                    <span class="hims-calendar-legend-dot procedure"></span>
+                    <span>Procedure</span>
+                  </div>
+                </div>
+
+                <!-- Active day schedule details -->
+                <div id="hims-calendar-schedule-details">
+                  <!-- Generated dynamically -->
+                </div>
+
+                <div class="hims-upcoming-pager">
+                  <button class="hims-pager-btn" id="hims-pager-prev">
+                    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span id="hims-upcoming-count">Upcoming (2)</span>
+                  <button class="hims-pager-btn" id="hims-pager-next">
+                    <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- HIMS Bottom Row Table Card -->
+          <div class="dashboard-grid">
+            <div class="panel-card col-12" style="border-radius: var(--radius-lg); padding:24px;">
+              <div class="hims-table-header-flex">
+                <h2 style="font-family:var(--font-title); font-size:16px; font-weight:700; color:var(--text-primary);">New patients</h2>
+                <div class="hims-table-controls-right">
+                  <div class="search-bar-container" style="max-width: 240px;">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="search-input" id="hims-patient-search" placeholder="Search anything here" style="padding: 8px 12px 8px 38px; font-size:13px;">
+                  </div>
+                  <button class="hims-filter-btn" id="hims-filter-btn">
+                    <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    <span>Filters</span>
+                  </button>
+                  <button class="btn btn-primary" style="background-color: var(--primary); padding: 8px 16px; font-size:13px;" id="hims-view-all-btn">View All</button>
+                </div>
+              </div>
+              
+              <div class="table-responsive">
+                <table class="data-table" id="hims-patients-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;"><input type="checkbox" class="hims-checkbox" id="hims-select-all-checkbox"></th>
+                      <th>Sr#</th>
+                      <th>ID Code</th>
+                      <th>Patient Name</th>
+                      <th>D.O.B</th>
+                      <th>Gender</th>
+                      <th>Age</th>
+                      <th>Created Date</th>
+                      <th>Time</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th style="text-align:right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="hims-patients-table-body">
+                    <!-- Dynamic Rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
+        </section>
+        
+        <!-- MODULE: PATIENT MANAGEMENT -->
+        <section class="content-panel" id="panel-patient-management">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Patient Directory</h1>
+              <p>Search, review records, and view clinical histories for all patients.</p>
+            </div>
+            <div class="action-buttons-group">
+              <div class="search-bar-container" style="min-width: 250px;">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="search-input" id="patient-directory-search" placeholder="Search by name, ID or phone...">
+              </div>
+              <button class="btn btn-primary" onclick="document.getElementById('dialog-register-patient').showModal()">Add Patient</button>
+            </div>
+          </div>
+          
+          <div class="panel-card col-12">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Patient ID</th>
+                    <th>Name</th>
+                    <th>Age/Gender</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Blood Group</th>
+                    <th>Allergies</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="directory-table-body">
+                  <!-- Dynamic Directory list -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: PATIENT REGISTRATION -->
+        <section class="content-panel" id="panel-patient-registration">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>In-take Registration Portal</h1>
+              <p>Register a new clinic member and schedule initial token queue allocation.</p>
+            </div>
+          </div>
+          
+          <div class="panel-card col-8" style="margin: 0 auto;">
+            <div class="panel-card-header">
+              <h3 class="panel-card-title">Registration Form</h3>
+            </div>
+            <form id="direct-registration-form">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Full Name *</label>
+                  <input type="text" class="form-control" name="name" required placeholder="E.g. Emily Watson">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Phone Number *</label>
+                  <input type="tel" class="form-control" name="phone" required placeholder="10-digit phone number">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Age *</label>
+                  <input type="number" class="form-control" name="age" required placeholder="E.g. 29" min="0" max="120">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Gender *</label>
+                  <select class="form-control" name="gender" required>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Email Address</label>
+                  <input type="email" class="form-control" name="email" placeholder="name@domain.com">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Blood Group</label>
+                  <select class="form-control" name="blood">
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </div>
+                <div class="form-group span-2">
+                  <label class="form-label">Known Allergies / Pre-existing Conditions</label>
+                  <input type="text" class="form-control" name="allergies" placeholder="Penicillin, Peanuts, Hypertension etc. (Leave blank if none)">
+                </div>
+                <div class="form-group span-2">
+                  <label class="form-label">Residential Address</label>
+                  <input type="text" class="form-control" name="address" placeholder="Street, City, Zip Code">
+                </div>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="reset" class="btn btn-secondary">Clear</button>
+                <button type="submit" class="btn btn-primary">Complete Registration</button>
+              </div>
+            </form>
+          </div>
+        </section>
+        
+        <!-- MODULE: OPD MANAGEMENT -->
+        <section class="content-panel" id="panel-opd-management">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Out-Patient Department (OPD)</h1>
+              <p>Active queues, specialist doctors, and walk-in consultation tracking.</p>
+            </div>
+            <div class="action-buttons-group">
+              <button class="btn btn-primary" id="opd-add-queue-btn">Assign Queue Token</button>
+            </div>
+          </div>
+          
+          <div class="dashboard-grid">
+            <div class="panel-card col-8">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Today's Active Consultations</h3>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Token</th>
+                      <th>Patient</th>
+                      <th>Doctor</th>
+                      <th>Specialty</th>
+                      <th>Status</th>
+                      <th>Check-in Time</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="opd-table-body">
+                    <!-- Dynamic OPD queue -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div class="panel-card col-4">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Doctor Rotations Today</h3>
+              </div>
+              <div class="queue-list">
+                <div class="queue-item">
+                  <div class="queue-item-left">
+                    <div style="width:8px; height:8px; border-radius:50%; background-color:var(--emerald);"></div>
+                    <div>
+                      <div class="queue-info-name">Dr. Aditya</div>
+                      <div class="queue-info-meta">Cardiology (Cabin A)</div>
+                    </div>
+                  </div>
+                  <span class="badge badge-emerald">On duty</span>
+                </div>
+                <div class="queue-item">
+                  <div class="queue-item-left">
+                    <div style="width:8px; height:8px; border-radius:50%; background-color:var(--emerald);"></div>
+                    <div>
+                      <div class="queue-info-name">Dr. Sarah Jenkins</div>
+                      <div class="queue-info-meta">Pediatrics (Cabin B)</div>
+                    </div>
+                  </div>
+                  <span class="badge badge-emerald">On duty</span>
+                </div>
+                <div class="queue-item">
+                  <div class="queue-item-left">
+                    <div style="width:8px; height:8px; border-radius:50%; background-color:var(--amber);"></div>
+                    <div>
+                      <div class="queue-info-name">Dr. Michael Cho</div>
+                      <div class="queue-info-meta">General Physician (Cabin C)</div>
+                    </div>
+                  </div>
+                  <span class="badge badge-amber">Rounds</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: IPD MANAGEMENT -->
+        <section class="content-panel" id="panel-ipd-management">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>In-Patient Department (IPD)</h1>
+              <p>Admitted patients, ward allocations, and inpatient observation timelines.</p>
+            </div>
+            <button class="btn btn-primary" id="ipd-admit-btn">Admit New Inpatient</button>
+          </div>
+          
+          <div class="panel-card col-12">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Ward / Bed</th>
+                    <th>Patient Name</th>
+                    <th>Diagnosis</th>
+                    <th>Admitted Date</th>
+                    <th>Attending Doctor</th>
+                    <th>Vitals Status</th>
+                    <th>Billing Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="ipd-table-body">
+                  <!-- Dynamic Inpatients -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: NURSING NOTES -->
+        <section class="content-panel" id="panel-nursing-notes">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Nursing Documentation</h1>
+              <p>Vitals charts, emergency notes, shift handovers, and hourly observations.</p>
+            </div>
+          </div>
+          
+          <div class="dashboard-grid">
+            <div class="panel-card col-4">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Add Note Entry</h3>
+              </div>
+              <form id="nursing-note-form">
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label">Select Patient</label>
+                  <select class="form-control" name="patientId" id="nursing-patient-select" required>
+                    <!-- Patients -->
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label">Nurse / Recorder</label>
+                  <input type="text" class="form-control" name="nurseName" required value="Nurse Emily Smith, RN">
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label">Log Priority</label>
+                  <select class="form-control" name="priority">
+                    <option value="Routine">Routine (Green)</option>
+                    <option value="Warning">Warning (Yellow)</option>
+                    <option value="Critical">Critical (Red)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom:16px;">
+                  <label class="form-label">Log Note Details</label>
+                  <textarea class="form-control" name="note" rows="5" required placeholder="Record patient vitals, complaints, medicines administered, and recovery states..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Post Note Entry</button>
+              </form>
+            </div>
+            
+            <div class="panel-card col-8">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Nursing Logs Feed</h3>
+              </div>
+              <div class="timeline-feed" id="nursing-feed-container" style="padding:10px 0 10px 20px;">
+                <!-- Feed -->
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: PHARMACY -->
+        <section class="content-panel" id="panel-pharmacy">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Pharmacy Fulfillment Center</h1>
+              <p>Review prescriptions issued by clinicians, package doses, and execute sales billing.</p>
+            </div>
+          </div>
+          
+          <div class="panel-card col-12">
+            <div class="panel-card-header">
+              <h3 class="panel-card-title">Pending Prescription Fulfillment Orders</h3>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Prescription ID</th>
+                    <th>Patient Name</th>
+                    <th>Diagnosis</th>
+                    <th>Medicines Prescribed</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="pharmacy-fulfillment-table-body">
+                  <!-- Dynamic orders -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: DRUG INVENTORY -->
+        <section class="content-panel" id="panel-drug-inventory">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Pharmacy Medicine Database</h1>
+              <p>Maintain pharmacy stock levels, drug pricing, safety margins, and expiration notifications.</p>
+            </div>
+            <button class="btn btn-rose" onclick="document.getElementById('dialog-add-medicine').showModal()">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Add Stock Item</span>
+            </button>
+          </div>
+          
+          <div class="panel-card col-12">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Medicine Name</th>
+                    <th>Category</th>
+                    <th>Active Stock</th>
+                    <th>Safety Threshold</th>
+                    <th>Unit Price</th>
+                    <th>Expiry Date</th>
+                    <th>Status</th>
+                    <th>Restock</th>
+                  </tr>
+                </thead>
+                <tbody id="inventory-table-body">
+                  <!-- Dynamic Stock items -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: BILLING -->
+        <section class="content-panel" id="panel-billing">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Billing & Invoices</h1>
+              <p>Generate, edit, track, and record payments for OPD consultations, pharmacy purchases, and ward entries.</p>
+            </div>
+            <button class="btn btn-emerald" onclick="document.getElementById('dialog-new-billing').showModal()">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Create Billing Invoice</span>
+            </button>
+          </div>
+          
+          <div class="panel-card col-12">
+            <div class="panel-card-header">
+              <h3 class="panel-card-title">Clinic Invoice Transactions</h3>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Invoice ID</th>
+                    <th>Date</th>
+                    <th>Patient Name</th>
+                    <th>Total Amount</th>
+                    <th>Payment Mode</th>
+                    <th>Payment Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="billing-table-body">
+                  <!-- Dynamic Invoices -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: REPORTS & ANALYTICS -->
+        <section class="content-panel" id="panel-reports-analytics">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Clinical Reports & Advanced Insights</h1>
+              <p>View detailed aggregated metrics regarding patient demographics, revenue growth, and prescription usage.</p>
+            </div>
+            <button class="btn btn-secondary" id="export-reports-btn">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Export Raw CSV Data</span>
+            </button>
+          </div>
+          
+          <div class="dashboard-grid">
+            <div class="panel-card col-6">
+              <h3 style="font-size:15px; font-weight:600; margin-bottom:15px;">Demographic Inpatient Growth</h3>
+              <div style="height: 300px; position:relative;">
+                <canvas id="largeGrowthChart"></canvas>
+              </div>
+            </div>
+            <div class="panel-card col-6">
+              <h3 style="font-size:15px; font-weight:600; margin-bottom:15px;">Department consultations</h3>
+              <div style="height: 300px; position:relative;">
+                <canvas id="largeSpecialtyChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: APPOINTMENTS -->
+        <section class="content-panel" id="panel-appointments">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Consultation Scheduler</h1>
+              <p>Manage, allocate, and schedule future patient visits with active clinic doctors.</p>
+            </div>
+            <button class="btn btn-primary" id="schedule-appointment-btn">Book Appointment</button>
+          </div>
+          
+          <div class="dashboard-grid">
+            <!-- Calendar layout representation -->
+            <div class="panel-card col-8">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Schedule Calendar Overview</h3>
+                <div style="font-weight:600; font-size:14px;" id="calendar-header-month">June 2026</div>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:8px; text-align:center; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">
+                <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:8px;" id="calendar-days-container">
+                <!-- Days will be generated -->
+              </div>
+            </div>
+            
+            <!-- Bookings List -->
+            <div class="panel-card col-4">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Bookings for Selected Date</h3>
+              </div>
+              <div class="queue-list" id="calendar-bookings-list">
+                <!-- Bookings -->
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- MODULE: SETTINGS -->
+        <section class="content-panel" id="panel-settings">
+          <div class="welcome-section">
+            <div class="welcome-text">
+              <h1>Clinic System Settings</h1>
+              <p>Manage clinic details, operating hours, active doctor shifts, and personal preferences.</p>
+            </div>
+          </div>
+          
+          <div class="dashboard-grid">
+            <div class="panel-card col-6">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Doctor Profile Settings</h3>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Full Name</label>
+                  <input type="text" class="form-control" value="Dr. Aditya Dev" id="settings-doc-name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Department / Designation</label>
+                  <input type="text" class="form-control" value="Lead Cardiologist" id="settings-doc-role">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Email Contact</label>
+                  <input type="email" class="form-control" value="aditya.dev@rkclinic.com">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Duty Cabin</label>
+                  <input type="text" class="form-control" value="Cabin A - First Floor">
+                </div>
+              </div>
+              <button class="btn btn-primary" id="save-profile-settings-btn" style="align-self:flex-end;">Save Profile Change</button>
+            </div>
+            
+            <div class="panel-card col-6">
+              <div class="panel-card-header">
+                <h3 class="panel-card-title">Clinic Organization Info</h3>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Clinic Branding Name</label>
+                  <input type="text" class="form-control" value="RK Clinic" id="settings-clinic-name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Currency Symbol</label>
+                  <select class="form-control" id="settings-currency">
+                    <option value="$">$ (USD)</option>
+                    <option value="₹">₹ (INR)</option>
+                    <option value="£">£ (GBP)</option>
+                    <option value="€">€ (EUR)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Daily Token Start #</label>
+                  <input type="number" class="form-control" value="101">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Auto-Fulfill Prescriptions</label>
+                  <select class="form-control">
+                    <option value="Yes">Enabled (Immediate inventory check)</option>
+                    <option value="No">Disabled (Pharmacist manually approves)</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-primary" id="save-clinic-settings-btn" style="align-self:flex-end;">Save Settings</button>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+    </main>
+    
+    <!-- PATIENT HISTORY DRAWER (View Drawer sliding in from right) -->
+    <div class="history-drawer" id="patient-history-drawer">
+      <div class="drawer-header">
+        <h3 class="modal-title">Patient Profile & History</h3>
+        <button class="modal-close-btn" id="close-history-drawer-btn">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="drawer-body">
+        
+        <!-- Summary Profile -->
+        <div class="patient-profile-summary">
+          <div class="patient-large-avatar" id="drawer-patient-avatar">JS</div>
+          <div>
+            <h2 id="drawer-patient-name" style="font-size:18px; font-weight:700; color:var(--text-primary);">John S. Watson</h2>
+            <div id="drawer-patient-id" style="font-size:12px; color:var(--text-muted); margin-top:2px;">Patient ID: RK-P-0234</div>
+          </div>
+        </div>
+        
+        <!-- Demographics -->
+        <div class="patient-grid-details">
+          <div class="detail-block">
+            <div class="detail-label">Age & Gender</div>
+            <div class="detail-value" id="drawer-patient-age-gender">42 / Male</div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-label">Blood Type</div>
+            <div class="detail-value" id="drawer-patient-blood">O-</div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-label">Phone Contact</div>
+            <div class="detail-value" id="drawer-patient-phone">+1 (555) 0192</div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-label">Known Allergies</div>
+            <div class="detail-value" style="color:var(--rose);" id="drawer-patient-allergies">Penicillin</div>
+          </div>
+          <div class="detail-block" style="grid-column: span 2;">
+            <div class="detail-label">Home Address</div>
+            <div class="detail-value" id="drawer-patient-address">221B Baker St, London</div>
+          </div>
+        </div>
+        
+        <!-- Historical Log Timeline -->
+        <div>
+          <h4 style="font-size:13px; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">Chronological Timeline</h4>
+          <div class="timeline-feed" id="drawer-timeline-feed">
+            <!-- Dynamic elements: prescriptions, visits, billing invoices -->
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ==================== MODALS / DIALOGS ==================== -->
+    
+    <!-- MODAL: REGISTER PATIENT -->
+    <dialog id="dialog-register-patient" closedby="any" aria-labelledby="regTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="regTitle">New Patient Registration</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('dialog-register-patient').close()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="modal-registration-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Full Name *</label>
+              <input type="text" class="form-control" name="name" required placeholder="E.g. Emily Watson">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone Number *</label>
+              <input type="tel" class="form-control" name="phone" required placeholder="10-digit phone number">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Age *</label>
+              <input type="number" class="form-control" name="age" required placeholder="E.g. 29" min="0" max="120">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gender *</label>
+              <select class="form-control" name="gender" required>
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <input type="email" class="form-control" name="email" placeholder="name@domain.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Blood Group</label>
+              <select class="form-control" name="blood">
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+              </select>
+            </div>
+            <div class="form-group span-2">
+              <label class="form-label">Known Allergies / Pre-existing Conditions</label>
+              <input type="text" class="form-control" name="allergies" placeholder="Penicillin, Peanuts, Hypertension etc. (Leave blank if none)">
+            </div>
+            <div class="form-group span-2">
+              <label class="form-label">Residential Address</label>
+              <input type="text" class="form-control" name="address" placeholder="Street, City, Zip Code">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('dialog-register-patient').close()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Patient Profile</button>
+        </div>
+      </form>
+    </dialog>
+    
+    <!-- MODAL: CREATE PRESCRIPTION -->
+    <dialog id="dialog-new-prescription" closedby="any" aria-labelledby="prescTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="prescTitle">Prescription Generator</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('dialog-new-prescription').close()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="prescription-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group span-2">
+              <label class="form-label">Select Patient *</label>
+              <select class="form-control" name="patientId" id="presc-patient-select" required>
+                <!-- Generated Patients -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Diagnosis *</label>
+              <input type="text" class="form-control" name="diagnosis" required placeholder="E.g. Acute Bronchitis">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Follow-up Days</label>
+              <input type="number" class="form-control" name="followup" value="7">
+            </div>
+          </div>
+          
+          <!-- Medicine Adder Builder -->
+          <div style="background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-top: 12px;">
+            <h4 style="font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:10px;">Medication builder</h4>
+            <div class="form-grid" style="margin-bottom: 12px;">
+              <div class="form-group">
+                <label class="form-label">Select Medicine</label>
+                <select class="form-control" id="presc-med-select">
+                  <!-- Generated stock options -->
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Dose Schedule</label>
+                <input type="text" class="form-control" id="presc-dose" placeholder="E.g. 1-0-1 (after meals)">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Duration (Days)</label>
+                <input type="number" class="form-control" id="presc-duration" value="5">
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="presc-add-med-btn" style="width:100%;">Add Medicine to Prescription</button>
+            
+            <table class="prescription-meds-table">
+              <thead>
+                <tr>
+                  <th>Drug Name</th>
+                  <th>Dose Frequency</th>
+                  <th>Duration</th>
+                  <th>Remove</th>
+                </tr>
+              </thead>
+              <tbody id="presc-meds-list-body">
+                <!-- Injected meds table row -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="form-group" style="margin-top:16px;">
+            <label class="form-label">Clinical Observations / Physician Notes</label>
+            <textarea class="form-control" name="symptoms" rows="3" placeholder="Slight fever, chest congestion heard..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('dialog-new-prescription').close()">Close</button>
+          <button type="submit" class="btn btn-teal">Save & Generate Script</button>
+        </div>
+      </form>
+    </dialog>
+    
+    <!-- MODAL: NEW BILLING ENTRY -->
+    <dialog id="dialog-new-billing" closedby="any" aria-labelledby="billTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="billTitle">New Transaction Invoice</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('dialog-new-billing').close()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="billing-invoice-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Select Patient *</label>
+              <select class="form-control" name="patientId" id="billing-patient-select" required>
+                <!-- Generated Patients -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Payment Mode *</label>
+              <select class="form-control" name="paymentMode" required>
+                <option value="Cash">Cash Payment</option>
+                <option value="Card">Credit/Debit Card</option>
+                <option value="Insurance">Insurance Pre-Auth</option>
+                <option value="UPI">UPI/Digital Transfer</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-top: 12px;">
+            <h4 style="font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:10px;">Invoice Items & Charges</h4>
+            <div class="form-grid" style="margin-bottom: 12px;">
+              <div class="form-group span-2">
+                <label class="form-label">Charge Name / Item Description</label>
+                <input type="text" class="form-control" id="bill-item-name" placeholder="E.g. General Consultation, Pharmacy Purchase, ECG test">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Amount ($ / ₹)</label>
+                <input type="number" class="form-control" id="bill-item-price" placeholder="E.g. 50">
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="billing-add-item-btn" style="width:100%;">Add Charge Item</button>
+            
+            <table class="prescription-meds-table" style="margin-top:12px;">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="billing-items-list-body">
+                <!-- Charge rows -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="billing-calculation-box">
+            <div class="billing-row">
+              <span>Subtotal:</span>
+              <span id="bill-subtotal">$0.00</span>
+            </div>
+            <div class="billing-row">
+              <span>Discount (%):</span>
+              <input type="number" class="form-control" id="bill-discount-input" value="0" style="padding: 4px 8px; width: 80px; font-size:12px; margin: 0;">
+            </div>
+            <div class="billing-row total">
+              <span>Grand Total:</span>
+              <span id="bill-grand-total">$0.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('dialog-new-billing').close()">Cancel</button>
+          <button type="submit" class="btn btn-emerald">Authorize & Print Bill</button>
+        </div>
+      </form>
+    </dialog>
+    
+    <!-- MODAL: ADD MEDICINE -->
+    <dialog id="dialog-add-medicine" closedby="any" aria-labelledby="medTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="medTitle">Add Inventory Item</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('dialog-add-medicine').close()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="medicine-inventory-form">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Drug / Brand Name *</label>
+              <input type="text" class="form-control" name="name" required placeholder="E.g. Metoprolol 50mg">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Drug Category *</label>
+              <select class="form-control" name="category" required>
+                <option value="Beta-blocker">Beta-blockers</option>
+                <option value="Antibiotic">Antibiotics</option>
+                <option value="Analgesic">Analgesics</option>
+                <option value="Anticoagulant">Anticoagulants</option>
+                <option value="Antidiabetic">Antidiabetic</option>
+                <option value="Inhaler">Respiratory Inhalers</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Initial Stock Qty *</label>
+              <input type="number" class="form-control" name="stock" required placeholder="E.g. 500" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Safety Margin Threshold *</label>
+              <input type="number" class="form-control" name="threshold" required placeholder="E.g. 50" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Unit Price ($ / ₹) *</label>
+              <input type="number" class="form-control" name="price" step="0.01" required placeholder="E.g. 1.25">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Expiry Date *</label>
+              <input type="date" class="form-control" name="expiry" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('dialog-add-medicine').close()">Cancel</button>
+          <button type="submit" class="btn btn-rose">Register Stock Item</button>
+        </div>
+      </form>
+    </dialog>
+    
+    <!-- MODAL: PRESCRIPTION PRINT OUT SUMMARY -->
+    <dialog id="dialog-print-prescription" closedby="any" aria-labelledby="printTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="printTitle">Prescription Printout Preview</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('dialog-print-prescription').close()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="prescription-print-preview" id="prescription-print-preview-container">
+          <!-- Printed contents -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('dialog-print-prescription').close()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">Mock Print Out</button>
+      </div>
+    </dialog>
+    
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
