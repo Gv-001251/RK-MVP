@@ -372,6 +372,54 @@ export function ClinicProvider({ children }) {
   const [labActiveTab, setLabActiveTab] = useState('dashboard');
   const [ipdActiveTab, setIpdActiveTab] = useState('dashboard');
 
+  // Doctor-Laboratory Integration: Structured Critical Alerts
+  const [labAlerts, setLabAlerts] = useState([
+    {
+      id: 'ALERT-001',
+      patientId: 'PAT-000002',
+      patientName: 'Faraj Bin Ahmad',
+      orderNumber: 'LAB-2026-0002',
+      testName: 'Lipid Profile',
+      parameter: 'Total Cholesterol',
+      value: '240 mg/dL',
+      refRange: '< 200 mg/dL',
+      severity: 'High',
+      acknowledged: false,
+      acknowledgedBy: null,
+      acknowledgedAt: null,
+      createdAt: '2026-06-17 09:45 AM'
+    },
+    {
+      id: 'ALERT-002',
+      patientId: 'PAT-000002',
+      patientName: 'Faraj Bin Ahmad',
+      orderNumber: 'LAB-2026-0002',
+      testName: 'Kidney Function Test (KFT)',
+      parameter: 'Serum Creatinine',
+      value: '1.4 mg/dL',
+      refRange: '0.6 - 1.2 mg/dL',
+      severity: 'High',
+      acknowledged: false,
+      acknowledgedBy: null,
+      acknowledgedAt: null,
+      createdAt: '2026-06-17 09:50 AM'
+    }
+  ]);
+
+  // Doctor-Laboratory Integration: LIS Analyzer Connection Metadata
+  const [analyzerConnections, setAnalyzerConnections] = useState([
+    { id: 'maglumi', name: 'Maglumi 800', dept: 'Immunology (CLIA)', protocol: 'TCP/IP', port: '192.168.1.101:9100', status: 'Online', lastPing: '2026-06-28 14:30:00', healthScore: 98 },
+    { id: 'weldon', name: 'Weldon WB-150 Biochemistry Analyzer', dept: 'Biochemistry', protocol: 'RS-232 Serial', port: 'COM3 / 9600 baud', status: 'Online', lastPing: '2026-06-28 14:29:55', healthScore: 95 },
+    { id: 'hematology', name: 'Hematology Analyzer', dept: 'Hematology', protocol: 'Ethernet', port: '192.168.1.102:8080', status: 'Online', lastPing: '2026-06-28 14:30:02', healthScore: 100 },
+    { id: 'urine', name: 'Urine Analyzer', dept: 'Clinical Pathology', protocol: 'USB', port: 'USB-HID Device 0x04B4', status: 'Online', lastPing: '2026-06-28 14:28:40', healthScore: 92 },
+    { id: 'electrolyte', name: 'Electrolyte Analyzer', dept: 'Clinical Chemistry', protocol: 'TCP/IP', port: '192.168.1.103:7001', status: 'Online', lastPing: '2026-06-28 14:30:01', healthScore: 97 },
+    { id: 'rapid', name: 'Rapid Test Analyzer', dept: 'Serology / POCT', protocol: 'RS-232 Serial', port: 'COM5 / 19200 baud', status: 'Online', lastPing: '2026-06-28 14:29:50', healthScore: 90 }
+  ]);
+
+  // Doctor-Laboratory Integration: Barcode Tracking (moved from component state to persist across tabs)
+  const [barcodeTracking, setBarcodeTracking] = useState({});
+  // Shape: { [labOrderNumber]: { generated: bool, generatedAt: string, printed: bool, printedAt: string, barcodeValue: string } }
+
   const login = (usernameOrEmail, password, selectedRole) => {
     const trimmed = usernameOrEmail.trim().toLowerCase();
     let resolvedRole = selectedRole || 'admin';
@@ -735,6 +783,379 @@ export function ClinicProvider({ children }) {
     setBackups(prev => [nextBackup, ...prev]);
   };
 
+  // ============================================================================
+  // DOCTOR–LABORATORY INTEGRATION: BACKEND MUTATORS
+  // ============================================================================
+
+  // Helper: Auto-detect abnormal/critical values from a result string and generate alerts
+  const autoDetectAbnormals = (orderNum, patientId, patientName, testResults) => {
+    if (!testResults) return;
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    Object.keys(testResults).forEach(testName => {
+      const resultObj = testResults[testName];
+      if (!resultObj || !resultObj.val) return;
+
+      const lines = resultObj.val.split(/,|\n/);
+      lines.forEach(line => {
+        const isHigh = /high/i.test(line);
+        const isLow = /low/i.test(line);
+        const isCritical = /critical/i.test(line) || /abnormal/i.test(line);
+
+        if (isHigh || isLow || isCritical) {
+          const paramName = line.split(':')[0]?.trim() || testName;
+          const cleanVal = line.split('(')[0].replace(new RegExp(testName + '\\s*:\\s*', 'i'), '').trim();
+          const refMatch = line.match(/\(Ref:\s*([^)]+)\)/);
+          const refRange = refMatch ? refMatch[1] : 'n/a';
+          const severity = isCritical ? 'Critical' : isHigh ? 'High' : 'Low';
+
+          const alertId = `ALERT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+          setLabAlerts(prev => {
+            // Prevent duplicate alerts for same patient+test+parameter
+            const exists = prev.find(a =>
+              a.patientId === patientId &&
+              a.testName === testName &&
+              a.parameter === paramName &&
+              a.orderNumber === orderNum
+            );
+            if (exists) return prev;
+
+            return [...prev, {
+              id: alertId,
+              patientId,
+              patientName,
+              orderNumber: orderNum,
+              testName,
+              parameter: paramName,
+              value: cleanVal,
+              refRange,
+              severity,
+              acknowledged: false,
+              acknowledgedBy: null,
+              acknowledgedAt: null,
+              createdAt: timestamp
+            }];
+          });
+        }
+      });
+    });
+  };
+
+  // 1. Register Lab Sample: Sample Collected → Sample Registered
+  const registerLabSample = (orderNum) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      status: 'Sample Registered',
+      processingStatus: 'Sample Registered',
+      registeredAt: timestamp
+    } : o));
+
+    setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
+      ...t,
+      status: 'Sample Registered',
+      processingStatus: 'Sample Registered',
+      registeredAt: timestamp
+    } : t));
+
+    setLabRequests(prev => prev.map(req => {
+      const order = labOrders.find(o => o.labOrderNumber === orderNum);
+      if (order && req.patientId === order.patientId && req.status === 'Collected') {
+        return { ...req, status: 'Sample Registered' };
+      }
+      return req;
+    }));
+  };
+
+  // 2. Mark Analyzer Running: → Analyzer Running
+  const markAnalyzerRunning = (orderNum) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      status: 'Analyzer Running',
+      processingStatus: 'Analyzer Running',
+      analyzerStartedAt: timestamp
+    } : o));
+
+    setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
+      ...t,
+      status: 'Analyzer Running',
+      processingStatus: 'Analyzer Running',
+      analyzerStartedAt: timestamp
+    } : t));
+  };
+
+  // 3. Mark QC Verification: → QC Verification
+  const markQCVerification = (orderNum) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      status: 'QC Verification',
+      processingStatus: 'QC Verification',
+      qcStartedAt: timestamp
+    } : o));
+
+    setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
+      ...t,
+      status: 'QC Verification',
+      processingStatus: 'QC Verification',
+      qcStartedAt: timestamp
+    } : t));
+  };
+
+  // 4. Generate Lab Report: Verified → Report Generated
+  const generateLabReport = (orderNum) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      status: 'Report Generated',
+      processingStatus: 'Report Generated',
+      reportGeneratedAt: timestamp
+    } : o));
+
+    setLabTasks(prev => prev.map(t => {
+      if (t.taskId === orderNum) {
+        return {
+          ...t,
+          status: 'Report Generated',
+          processingStatus: 'Report Generated',
+          reportGeneratedAt: timestamp
+        };
+      }
+      return t;
+    }));
+
+    // Log nursing note for report generation
+    const order = labOrders.find(o => o.labOrderNumber === orderNum);
+    if (order) {
+      setNursingNotes(prev => [{
+        time: 'Just now',
+        author: 'LIS Report Generator',
+        priority: 'Routine',
+        patientId: order.patientId,
+        text: `Lab Report Generated for order ${orderNum}. Tests: ${order.orderedTests.join(', ')}. Report ready for delivery.`
+      }, ...prev]);
+    }
+  };
+
+  // 5. Deliver Lab Report: Report Generated → Report Delivered
+  const deliverLabReport = (orderNum, deliveredToDoctorName) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      status: 'Report Delivered',
+      processingStatus: 'Report Delivered',
+      reportDeliveredAt: timestamp,
+      reportDeliveredTo: deliveredToDoctorName || 'Doctor'
+    } : o));
+
+    setLabTasks(prev => prev.map(t => {
+      if (t.taskId === orderNum) {
+        setNursingNotes(notes => [{
+          time: 'Just now',
+          author: 'LIS Report Delivery',
+          priority: 'Routine',
+          patientId: t.clinicPatientId,
+          text: `Lab Report Delivered to ${deliveredToDoctorName || 'Doctor'} for order ${orderNum}. Tests: ${t.orderedTests.join(', ')}.`
+        }, ...notes]);
+
+        return {
+          ...t,
+          status: 'Report Delivered',
+          processingStatus: 'Report Delivered',
+          reportDeliveredAt: timestamp,
+          reportDeliveredTo: deliveredToDoctorName || 'Doctor'
+        };
+      }
+      return t;
+    }));
+  };
+
+  // 6. Generic Lab Order Status Updater
+  const updateLabOrderStatus = (orderNum, newStatus) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      status: newStatus,
+      processingStatus: newStatus,
+      lastStatusUpdate: timestamp
+    } : o));
+
+    setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
+      ...t,
+      status: newStatus,
+      processingStatus: newStatus,
+      lastStatusUpdate: timestamp
+    } : t));
+  };
+
+  // 7. Add Critical Alert (structured)
+  const addCriticalAlert = (alertData) => {
+    const alertId = `ALERT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabAlerts(prev => [...prev, {
+      id: alertId,
+      patientId: alertData.patientId,
+      patientName: alertData.patientName || 'Unknown',
+      orderNumber: alertData.orderNumber || '',
+      testName: alertData.testName,
+      parameter: alertData.parameter || alertData.testName,
+      value: alertData.value,
+      refRange: alertData.refRange || 'n/a',
+      severity: alertData.severity || 'High',
+      acknowledged: false,
+      acknowledgedBy: null,
+      acknowledgedAt: null,
+      createdAt: timestamp
+    }]);
+  };
+
+  // 8. Acknowledge Critical Alert
+  const acknowledgeCriticalAlert = (alertId, acknowledgedByName) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setLabAlerts(prev => prev.map(a => a.id === alertId ? {
+      ...a,
+      acknowledged: true,
+      acknowledgedBy: acknowledgedByName || 'Doctor',
+      acknowledgedAt: timestamp
+    } : a));
+  };
+
+  // 9. Get Patient Lab History (all lab tasks for a patient, sorted by date)
+  const getPatientLabHistory = (patientId) => {
+    const tasks = labTasks.filter(t =>
+      t.clinicPatientId === patientId || t.patientId === patientId
+    );
+
+    return tasks.sort((a, b) => {
+      const dateA = a.verifiedAt || a.reportGeneratedAt || a.completedAt || '1970-01-01';
+      const dateB = b.verifiedAt || b.reportGeneratedAt || b.completedAt || '1970-01-01';
+      return new Date(dateB) - new Date(dateA);
+    });
+  };
+
+  // 10. Get Analyzer Worklist (grouped pending tasks for a specific analyzer)
+  const getAnalyzerWorklist = (analyzerId) => {
+    const analyzerTestMap = {
+      'maglumi': ['thyroid', 'tsh'],
+      'weldon': ['hba1c', 'lipid', 'lft', 'kft', 'liver', 'kidney', 'blood sugar', 'fbs'],
+      'hematology': ['cbc', 'esr'],
+      'urine': ['urine'],
+      'electrolyte': ['electrolyte'],
+      'rapid': ['crp']
+    };
+
+    const keywords = analyzerTestMap[analyzerId] || [];
+
+    const worklist = [];
+    labTasks.forEach(task => {
+      if (['Sample Collected', 'Sample Registered', 'Processing', 'Assigned'].includes(task.status)) {
+        const matchingTests = task.orderedTests.filter(testName => {
+          const nameLower = testName.toLowerCase();
+          return keywords.some(kw => nameLower.includes(kw));
+        });
+
+        if (matchingTests.length > 0) {
+          worklist.push({
+            taskId: task.taskId,
+            patientId: task.clinicPatientId || task.patientId,
+            patientName: task.patientName,
+            specimenId: task.specimenId,
+            tests: matchingTests,
+            priority: task.priority || 'Routine',
+            status: task.status,
+            collectionTime: task.collectionTime || ''
+          });
+        }
+      }
+    });
+
+    // Sort by priority (STAT > Urgent > Routine)
+    const priorityOrder = { 'STAT': 0, 'Urgent': 1, 'Routine': 2 };
+    return worklist.sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
+  };
+
+  // 11. Escalate Lab Order Priority
+  const escalateLabOrder = (orderNum, newPriority) => {
+    setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+      ...o,
+      priority: newPriority
+    } : o));
+
+    setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
+      ...t,
+      priority: newPriority
+    } : t));
+
+    // Log nursing note for priority change
+    const order = labOrders.find(o => o.labOrderNumber === orderNum);
+    if (order) {
+      setNursingNotes(prev => [{
+        time: 'Just now',
+        author: 'Lab Priority System',
+        priority: newPriority === 'STAT' ? 'Critical' : 'Routine',
+        patientId: order.patientId,
+        text: `Lab Order ${orderNum} escalated to ${newPriority} priority. Tests: ${order.orderedTests.join(', ')}.`
+      }, ...prev]);
+    }
+  };
+
+  // 12. Generate Barcode for Order (persist in context)
+  const generateBarcode = (orderNum) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const suffix = orderNum.split('-').pop();
+    const barcodeValue = `RKLAB-${suffix}`;
+
+    setBarcodeTracking(prev => ({
+      ...prev,
+      [orderNum]: {
+        ...prev[orderNum],
+        generated: true,
+        generatedAt: timestamp,
+        barcodeValue,
+        printed: prev[orderNum]?.printed || false,
+        printedAt: prev[orderNum]?.printedAt || null
+      }
+    }));
+
+    return barcodeValue;
+  };
+
+  // 13. Mark Barcode Printed for Order
+  const markBarcodePrinted = (orderNum) => {
+    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    setBarcodeTracking(prev => ({
+      ...prev,
+      [orderNum]: {
+        ...prev[orderNum],
+        printed: true,
+        printedAt: timestamp
+      }
+    }));
+  };
+
+  // 14. Update Analyzer Connection Status
+  const updateAnalyzerStatus = (analyzerId, status, lastPingTime) => {
+    const timestamp = lastPingTime || new Date().toISOString().replace('T', ' ').split('.')[0];
+
+    setAnalyzerConnections(prev => prev.map(a => a.id === analyzerId ? {
+      ...a,
+      status,
+      lastPing: timestamp,
+      healthScore: status === 'Online' ? Math.min(100, a.healthScore + 1) : Math.max(0, a.healthScore - 10)
+    } : a));
+  };
+
   return (
     <ClinicContext.Provider value={{
       currency, setCurrency,
@@ -762,6 +1183,27 @@ export function ClinicProvider({ children }) {
       labTasks, setLabTasks,
       labActiveTab, setLabActiveTab,
       ipdActiveTab, setIpdActiveTab,
+
+      // Doctor-Laboratory Integration: New State
+      labAlerts, setLabAlerts,
+      analyzerConnections, setAnalyzerConnections,
+      barcodeTracking, setBarcodeTracking,
+
+      // Doctor-Laboratory Integration: New Actions
+      registerLabSample,
+      markAnalyzerRunning,
+      markQCVerification,
+      generateLabReport,
+      deliverLabReport,
+      updateLabOrderStatus,
+      addCriticalAlert,
+      acknowledgeCriticalAlert,
+      getPatientLabHistory,
+      getAnalyzerWorklist,
+      escalateLabOrder,
+      generateBarcode,
+      markBarcodePrinted,
+      updateAnalyzerStatus,
       
       // Actions
       login,
@@ -956,7 +1398,7 @@ export function ClinicProvider({ children }) {
           const order = orders.find(o => o.labOrderNumber === orderNum);
           if (order) {
             setLabRequests(prev => prev.map(req => {
-              if (req.patientId === order.patientId && (req.status === 'Collected' || req.status === 'Ordered' || req.status === 'Pending Sample Collection')) {
+              if (req.patientId === order.patientId && (req.status === 'Collected' || req.status === 'Ordered' || req.status === 'Pending Sample Collection' || req.status === 'Sample Registered')) {
                 const testRes = results[req.testName];
                 return {
                   ...req,
@@ -966,6 +1408,9 @@ export function ClinicProvider({ children }) {
               }
               return req;
             }));
+
+            // Auto-detect abnormal/critical values and generate structured alerts
+            autoDetectAbnormals(orderNum, order.patientId, order.patientName, results);
           }
           return orders;
         });
@@ -1008,7 +1453,7 @@ export function ClinicProvider({ children }) {
           const order = orders.find(o => o.labOrderNumber === orderNum);
           if (order) {
             setLabRequests(prev => prev.map(req => {
-              if (req.patientId === order.patientId && (req.status === 'Pending Verification' || req.status === 'Collected' || req.status === 'Ordered')) {
+              if (req.patientId === order.patientId && (req.status === 'Pending Verification' || req.status === 'Collected' || req.status === 'Ordered' || req.status === 'Sample Registered')) {
                 return {
                   ...req,
                   status: 'Verified',
@@ -1020,6 +1465,9 @@ export function ClinicProvider({ children }) {
           }
           return orders;
         });
+
+        // Auto-generate report after verification
+        generateLabReport(orderNum);
       },
       addLabRequest: (patientId, testName) => {
         const pat = patients.find(p => p.id === patientId);

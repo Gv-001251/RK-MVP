@@ -42,13 +42,55 @@ export default function LaboratoryPanel() {
     labRequests,
     setLabRequests,
     labActiveTab,
-    setLabActiveTab
+    setLabActiveTab,
+    patients,
+    // Doctor-Laboratory Integration: New context values
+    barcodeTracking,
+    generateBarcode: contextGenerateBarcode,
+    markBarcodePrinted: contextMarkBarcodePrinted,
+    analyzerConnections,
+    updateAnalyzerStatus,
+    registerLabSample,
+    markAnalyzerRunning,
+    markQCVerification,
+    generateLabReport,
+    deliverLabReport,
+    updateLabOrderStatus,
+    escalateLabOrder,
+    getAnalyzerWorklist,
+    labAlerts
   } = useClinic();
 
   // State variables for Incoming Queue & Sample Collection matching
   const [activeOrderForCollection, setActiveOrderForCollection] = useState(null);
-  const [barcodeGeneratedForOrder, setBarcodeGeneratedForOrder] = useState({});
-  const [barcodePrintedForOrder, setBarcodePrintedForOrder] = useState({});
+  // Barcode tracking now uses context-based state for persistence
+  const barcodeGeneratedForOrder = Object.fromEntries(
+    Object.entries(barcodeTracking || {}).map(([k, v]) => [k, v?.generated || false])
+  );
+  const barcodePrintedForOrder = Object.fromEntries(
+    Object.entries(barcodeTracking || {}).map(([k, v]) => [k, v?.printed || false])
+  );
+  const setBarcodeGeneratedForOrder = (updater) => {
+    // Compatibility wrapper: intercept local set calls and redirect to context
+    if (typeof updater === 'function') {
+      const result = updater(barcodeGeneratedForOrder);
+      Object.keys(result).forEach(orderNum => {
+        if (result[orderNum] && !barcodeGeneratedForOrder[orderNum]) {
+          contextGenerateBarcode(orderNum);
+        }
+      });
+    }
+  };
+  const setBarcodePrintedForOrder = (updater) => {
+    if (typeof updater === 'function') {
+      const result = updater(barcodePrintedForOrder);
+      Object.keys(result).forEach(orderNum => {
+        if (result[orderNum] && !barcodePrintedForOrder[orderNum]) {
+          contextMarkBarcodePrinted(orderNum);
+        }
+      });
+    }
+  };
   const [collectionSampleType, setCollectionSampleType] = useState('Blood');
   const [collectionBy, setCollectionBy] = useState('Lab Tech Suresh');
   const [collectionTime, setCollectionTime] = useState('');
@@ -97,6 +139,24 @@ export default function LaboratoryPanel() {
     { id: 4, time: '11:15:30', text: 'LAB-2026-0003: Swiped & registered for specimen containership.', type: 'sys' }
   ]);
 
+  // Sync analyzers state with context analyzerConnections
+  useEffect(() => {
+    if (analyzerConnections) {
+      setAnalyzers(prev => prev.map(a => {
+        const conn = analyzerConnections.find(c => c.id === a.id);
+        if (conn) {
+          return {
+            ...a,
+            status: conn.status,
+            protocol: conn.protocol,
+            port: conn.port,
+            healthScore: conn.healthScore
+          };
+        }
+        return a;
+      }));
+    }
+  }, [analyzerConnections]);
 
   // Sync waiting queue count for analyzers
   useEffect(() => {
@@ -104,7 +164,7 @@ export default function LaboratoryPanel() {
       setAnalyzers(prev => prev.map(mac => {
         let waiting = 0;
         labTasks.forEach(task => {
-          if (task.status === 'Sample Collected' || task.status === 'Processing') {
+          if (['Sample Collected', 'Sample Registered', 'Processing', 'Analyzer Running'].includes(task.status)) {
             task.orderedTests.forEach(t => {
               const dest = getMachineForTest(t);
               if (dest && dest.id === mac.id && !task.testResults[t]) {
@@ -509,6 +569,11 @@ export default function LaboratoryPanel() {
     setAnalyzers(prev => prev.map(a => a.id === selectedAnalyzerId ? { ...a, workState: 'Processing', currentSample: selectedTaskForRun.specimenId } : a));
     addLisLog(`Centrifuge Spin running on ${machine.name} for sample ${selectedTaskForRun.specimenId}.`, 'warning');
 
+    // Notify backend analyzer running
+    if (markAnalyzerRunning) {
+      markAnalyzerRunning(selectedTaskForRun.taskId);
+    }
+
     const interval = setInterval(() => {
       setAnalysisProgress(p => {
         if (p >= 100) {
@@ -523,26 +588,15 @@ export default function LaboratoryPanel() {
             // Generate output values
             const generatedOutputs = generateSimulatedResults(testsToRun);
 
-            setLabTasks(prev => prev.map(task => {
-              if (task.taskId === selectedTaskForRun.taskId) {
-                const updatedResults = { ...task.testResults, ...generatedOutputs };
-                
-                // Check if all tests completed
-                const allDone = task.orderedTests.every(t => updatedResults[t]);
-                const nextStatus = allDone ? 'Pending Verification' : 'Processing';
+            // Call backend context to save results and update EMR/Alerts
+            saveLabResult(selectedTaskForRun.taskId, generatedOutputs, machine.name);
+            
+            // Advance task status to QC Verification
+            if (markQCVerification) {
+              markQCVerification(selectedTaskForRun.taskId);
+            }
 
-                if (allDone) {
-                  addLisLog(`LIS Task ${task.taskId}: Machine Completed. Pushed to QC verification.`, 'success');
-                }
-
-                return {
-                  ...task,
-                  status: nextStatus,
-                  testResults: updatedResults
-                };
-              }
-              return task;
-            }));
+            addLisLog(`LIS Task ${selectedTaskForRun.taskId}: Machine Completed. Pushed to QC verification.`, 'success');
 
             // Reset machine workstate
             setAnalyzers(prev => prev.map(a => a.id === selectedAnalyzerId ? { ...a, workState: 'Ready', currentSample: '-', completedCount: a.completedCount + 1 } : a));
@@ -804,7 +858,16 @@ export default function LaboratoryPanel() {
         );
 
       case 'results': // Analyzer Port Tab
-        const activeVials = labTasks.filter(t => ['Sample Collected', 'Assigned', 'Processing', 'Completed'].includes(t.status));
+        const activeVials = labTasks.filter(t => [
+          'Sample Collected', 
+          'Sample Registered', 
+          'Assigned', 
+          'Processing', 
+          'Analyzer Running', 
+          'QC Verification', 
+          'Pending Verification', 
+          'Completed'
+        ].includes(t.status));
         
         return (
           <div className="dashboard-grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
@@ -852,135 +915,166 @@ export default function LaboratoryPanel() {
                       <strong>Machine Assigned:</strong> {selectedTaskForRun.machineAssigned || 'None'}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', margin: '4px 0' }}>
-                      <button 
-                        type="button" 
-                        className={`btn ${!manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setManualEntryMode(false)}
-                        style={{ flex: 1, fontSize: '12px' }}
-                      >
-                        🔬 LIS Analyzer Import
-                      </button>
-                      <button 
-                        type="button" 
-                        className={`btn ${manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setManualEntryMode(true)}
-                        style={{ flex: 1, fontSize: '12px' }}
-                      >
-                        ✍️ Manual Result Entry
-                      </button>
-                    </div>
+                    {selectedTaskForRun.status === 'Sample Collected' && (
+                      <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '8px', margin: '4px 0' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--amber)', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                          ⚠️ Specimen container must be registered at the Pathology desk before processing.
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-amber btn-sm"
+                          style={{ width: '100%', height: '36px', fontWeight: 'bold' }}
+                          onClick={() => {
+                            registerLabSample(selectedTaskForRun.taskId);
+                            // Update selection reference status locally
+                            setSelectedTaskForRun(prev => ({ ...prev, status: 'Sample Registered' }));
+                            addLisLog(`Specimen ${selectedTaskForRun.specimenId} registered at Pathology Lab.`, 'success');
+                          }}
+                        >
+                          📥 Register Specimen Container
+                        </button>
+                      </div>
+                    )}
 
-                    {!manualEntryMode ? (
-                      /* LIS Analyzer Mode */
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label className="input-label-style">Select Connected Analyzer Port</label>
-                          <select 
-                            value={selectedAnalyzerId}
-                            onChange={(e) => {
-                              setSelectedAnalyzerId(e.target.value);
-                            }}
-                            className="select-input-style"
+                    {selectedTaskForRun.status !== 'Sample Collected' ? (
+                      <>
+                        <div style={{ display: 'flex', gap: '10px', margin: '4px 0' }}>
+                          <button 
+                            type="button" 
+                            className={`btn ${!manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setManualEntryMode(false)}
+                            style={{ flex: 1, fontSize: '12px' }}
                           >
-                            <option value="">-- Choose Target Analyzer Machine --</option>
-                            {analyzers.map(mac => {
-                              const isCompatible = selectedTaskForRun.orderedTests.some(t => {
-                                const dest = getMachineForTest(t);
-                                return dest && dest.id === mac.id;
-                              });
-                              return (
-                                <option key={mac.id} value={mac.id}>
-                                  {mac.name} - {mac.dept} {isCompatible ? '★ (Recommended)' : ''}
-                                </option>
-                              );
-                            })}
-                          </select>
+                            🔬 LIS Analyzer Import
+                          </button>
+                          <button 
+                            type="button" 
+                            className={`btn ${manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setManualEntryMode(true)}
+                            style={{ flex: 1, fontSize: '12px' }}
+                          >
+                            ✍️ Manual Result Entry
+                          </button>
                         </div>
 
-                        {selectedAnalyzerId && (
-                          <div style={{ display: 'flex', gap: '10px' }}>
+                        {!manualEntryMode ? (
+                          /* LIS Analyzer Mode */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label className="input-label-style">Select Connected Analyzer Port</label>
+                              <select 
+                                value={selectedAnalyzerId}
+                                onChange={(e) => {
+                                  setSelectedAnalyzerId(e.target.value);
+                                }}
+                                className="select-input-style"
+                              >
+                                <option value="">-- Choose Target Analyzer Machine --</option>
+                                {analyzers.map(mac => {
+                                  const isCompatible = selectedTaskForRun.orderedTests.some(t => {
+                                    const dest = getMachineForTest(t);
+                                    return dest && dest.id === mac.id;
+                                  });
+                                  return (
+                                    <option key={mac.id} value={mac.id}>
+                                      {mac.name} - {mac.dept} {isCompatible ? '★ (Recommended)' : ''}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            {selectedAnalyzerId && (
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                <button 
+                                  type="button" 
+                                  className="btn btn-indigo"
+                                  style={{ flex: 1, height: '40px', fontWeight: '750' }}
+                                  onClick={() => {
+                                    assignLabMachine(selectedTaskForRun.taskId, analyzers.find(a => a.id === selectedAnalyzerId)?.name);
+                                    addLisLog(`Assigned ${selectedTaskForRun.taskId} to analyzer ${selectedAnalyzerId}`, 'info');
+                                    handleLaunchAnalyzer();
+                                  }}
+                                  disabled={isAnalyzing}
+                                >
+                                  🚀 Assign & Run Analyzer Cycle
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Manual Entry Mode */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <strong style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                              Manual Observations:
+                            </strong>
+                            {selectedTaskForRun.orderedTests.map(testName => (
+                              <div key={testName} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <label style={{ fontSize: '11.5px', fontWeight: '700' }}>{testName} Results</label>
+                                  <button 
+                                    type="button" 
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ padding: '2px 6px', fontSize: '9.5px' }}
+                                    onClick={() => {
+                                      const defaults = generateSimulatedResults([testName]);
+                                      setManualResultsObj(prev => ({
+                                        ...prev,
+                                        [testName]: defaults[testName]?.val || ''
+                                      }));
+                                    }}
+                                  >
+                                    Load Template
+                                  </button>
+                                </div>
+                                <textarea 
+                                  rows="2"
+                                  value={manualResultsObj[testName] || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setManualResultsObj(prev => ({ ...prev, [testName]: val }));
+                                  }}
+                                  className="clinical-textarea"
+                                  placeholder={`Enter observations for ${testName}...`}
+                                  style={{ minHeight: '60px', fontSize: '12px' }}
+                                />
+                              </div>
+                            ))}
+
                             <button 
                               type="button" 
                               className="btn btn-indigo"
-                              style={{ flex: 1, height: '40px', fontWeight: '750' }}
+                              style={{ height: '40px', fontWeight: '800', marginTop: '6px' }}
                               onClick={() => {
-                                assignLabMachine(selectedTaskForRun.taskId, analyzers.find(a => a.id === selectedAnalyzerId)?.name);
-                                startMachineRun(selectedTaskForRun.taskId);
-                                addLisLog(`Assigned ${selectedTaskForRun.taskId} to analyzer ${selectedAnalyzerId}`, 'info');
-                                handleLaunchAnalyzer();
+                                const resultsPayload = {};
+                                const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                selectedTaskForRun.orderedTests.forEach(test => {
+                                  resultsPayload[test] = {
+                                    val: manualResultsObj[test] || 'Standard observation values verified normal.',
+                                    machine: 'Manual Entry',
+                                    completedAt: timestamp
+                                  };
+                                });
+
+                                saveLabResult(selectedTaskForRun.taskId, resultsPayload, 'Manual Entry');
+                                if (markQCVerification) {
+                                  markQCVerification(selectedTaskForRun.taskId);
+                                }
+                                alert(`Success: Results saved manually for specimen ${selectedTaskForRun.specimenId}. Pushed to Pathology Verification QC.`);
+                                addLisLog(`Manual result entry completed for task ${selectedTaskForRun.taskId}`, 'success');
+                                setSelectedTaskForRun(null);
+                                setManualEntryMode(false);
+                                setLabActiveTab('reports');
                               }}
-                              disabled={isAnalyzing}
                             >
-                              🚀 Assign & Run Analyzer Cycle
+                              ✓ Save Results & Mark Completed
                             </button>
                           </div>
                         )}
-                      </div>
+                      </>
                     ) : (
-                      /* Manual Entry Mode */
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <strong style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-                          Manual Observations:
-                        </strong>
-                        {selectedTaskForRun.orderedTests.map(testName => (
-                          <div key={testName} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <label style={{ fontSize: '11.5px', fontWeight: '700' }}>{testName} Results</label>
-                              <button 
-                                type="button" 
-                                className="btn btn-secondary btn-sm"
-                                style={{ padding: '2px 6px', fontSize: '9.5px' }}
-                                onClick={() => {
-                                  const defaults = generateSimulatedResults([testName]);
-                                  setManualResultsObj(prev => ({
-                                    ...prev,
-                                    [testName]: defaults[testName]?.val || ''
-                                  }));
-                                }}
-                              >
-                                Load Template
-                              </button>
-                            </div>
-                            <textarea 
-                              rows="2"
-                              value={manualResultsObj[testName] || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setManualResultsObj(prev => ({ ...prev, [testName]: val }));
-                              }}
-                              className="clinical-textarea"
-                              placeholder={`Enter observations for ${testName}...`}
-                              style={{ minHeight: '60px', fontSize: '12px' }}
-                            />
-                          </div>
-                        ))}
-
-                        <button 
-                          type="button" 
-                          className="btn btn-indigo"
-                          style={{ height: '40px', fontWeight: '800', marginTop: '6px' }}
-                          onClick={() => {
-                            const resultsPayload = {};
-                            const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            selectedTaskForRun.orderedTests.forEach(test => {
-                              resultsPayload[test] = {
-                                val: manualResultsObj[test] || 'Standard observation values verified normal.',
-                                machine: 'Manual Entry',
-                                completedAt: timestamp
-                              };
-                            });
-
-                            saveLabResult(selectedTaskForRun.taskId, resultsPayload, 'Manual Entry');
-                            alert(`Success: Results saved manually for specimen ${selectedTaskForRun.specimenId}. Pushed to Pathology Verification QC.`);
-                            addLisLog(`Manual result entry completed for task ${selectedTaskForRun.taskId}`, 'success');
-                            setSelectedTaskForRun(null);
-                            setManualEntryMode(false);
-                            setLabActiveTab('reports');
-                          }}
-                        >
-                          ✓ Save Results & Mark Completed
-                        </button>
+                      <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px', backgroundColor: 'var(--bg-surface)', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
+                        🔒 Please register the specimen container to unlock LIS Analyzer Assignment & result entry panels.
                       </div>
                     )}
                   </div>
@@ -1036,14 +1130,22 @@ export default function LaboratoryPanel() {
         );
 
       case 'reports': // Pathologist QC Tab
-        const verificationTasks = labTasks.filter(t => ['Pending Verification', 'Machine Completed', 'Completed', 'Verified'].includes(t.status));
+        const verificationTasks = labTasks.filter(t => [
+          'QC Verification',
+          'Pending Verification', 
+          'Machine Completed', 
+          'Completed', 
+          'Verified',
+          'Report Generated',
+          'Report Delivered'
+        ].includes(t.status));
         
         return (
           <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             {/* Left side: Queue of reports */}
             <div className="panel-card" style={{ padding: '24px', borderRadius: '16px' }}>
               <h3 className="panel-card-title" style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-                🛡️ Pathologist verification & QC Queue ({verificationTasks.filter(t => t.status !== 'Verified').length})
+                🛡️ Pathologist verification & QC Queue ({verificationTasks.filter(t => !['Verified', 'Report Generated', 'Report Delivered'].includes(t.status)).length})
               </h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '420px' }}>
@@ -1061,7 +1163,7 @@ export default function LaboratoryPanel() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <button 
-                        className={`btn ${t.status === 'Verified' ? 'btn-secondary' : 'btn-indigo'} btn-sm`}
+                        className={`btn ${['Verified', 'Report Generated', 'Report Delivered'].includes(t.status) ? 'btn-secondary' : 'btn-indigo'} btn-sm`}
                         onClick={() => {
                           setActiveTaskForQC(t);
                           setQcRemarks(t.remarks);
@@ -1069,7 +1171,7 @@ export default function LaboratoryPanel() {
                         }}
                         style={{ padding: '6px 12px', fontSize: '11.5px' }}
                       >
-                        {t.status === 'Verified' ? '👁️ View Report' : '🛡️ Verify QC'}
+                        {['Verified', 'Report Generated', 'Report Delivered'].includes(t.status) ? '👁️ View Report' : '🛡️ Verify QC'}
                       </button>
                     </div>
                   </div>
@@ -1118,7 +1220,7 @@ export default function LaboratoryPanel() {
                     </table>
                   </div>
 
-                  {activeTaskForQC.status !== 'Verified' ? (
+                  {!['Verified', 'Report Generated', 'Report Delivered'].includes(activeTaskForQC.status) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <label className="input-label-style">Technician/Pathologist Remarks</label>
                       <textarea 
@@ -1323,6 +1425,9 @@ export default function LaboratoryPanel() {
                       <div>
                         <strong>{mac.name}</strong><br />
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{mac.dept}</span>
+                        <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', marginTop: '4.5px' }}>
+                          Interface: <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 'bold' }}>{mac.protocol || 'TCP/IP'} ({mac.port || 'Port Connected'})</span>
+                        </div>
                         <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                           Current: <code>{mac.currentSample}</code> | Waiting: <strong>{mac.waitingCount}</strong>
                         </div>

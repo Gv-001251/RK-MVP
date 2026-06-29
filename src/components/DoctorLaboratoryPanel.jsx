@@ -33,14 +33,24 @@ export default function DoctorLaboratoryPanel() {
       case 'Sample Collected':
       case 'Collected':
         return 'Sample Collected';
+      case 'Sample Registered':
+        return 'Sample Registered';
       case 'Processing':
+      case 'Assigned':
         return 'Processing';
+      case 'Analyzer Running':
+        return 'Analyzer Running';
+      case 'QC Verification':
+        return 'QC Verification';
       case 'Pending Verification':
       case 'Machine Completed':
         return 'Verification Pending';
       case 'Verified':
       case 'Completed':
         return 'Completed';
+      case 'Report Generated':
+        return 'Report Generated';
+      case 'Report Delivered':
       case 'Delivered':
         return 'Delivered';
       default:
@@ -55,12 +65,16 @@ export default function DoctorLaboratoryPanel() {
       case 'Ordered':
         return 'badge-amber';
       case 'Sample Collected':
+      case 'Sample Registered':
         return 'badge-sky';
       case 'Processing':
+      case 'Analyzer Running':
         return 'badge-indigo';
+      case 'QC Verification':
       case 'Verification Pending':
         return 'badge-cyan';
       case 'Completed':
+      case 'Report Generated':
         return 'badge-emerald';
       case 'Delivered':
         return 'badge-teal';

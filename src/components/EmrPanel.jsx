@@ -12,7 +12,13 @@ export default function EmrPanel({ initialSelectedPatientId }) {
     invoices,
     appointments,
     doctorName,
-    currency
+    currency,
+    labTasks,
+    labOrders,
+    labAlerts,
+    getPatientLabHistory,
+    acknowledgeCriticalAlert,
+    deliverLabReport
   } = useClinic();
 
   const [selectedPatientId, setSelectedPatientId] = useState(initialSelectedPatientId || patients[0]?.id || '');
@@ -36,6 +42,11 @@ export default function EmrPanel({ initialSelectedPatientId }) {
   const patientPrescriptions = prescriptions.filter(rx => rx.patientId === selectedPatientId);
   const patientInvoices = invoices.filter(inv => inv.patientId === selectedPatientId);
   const patientAppointments = appointments.filter(app => app.patientId === selectedPatientId);
+
+  // Lab data for selected patient (EMR-linked laboratory reports)
+  const patientLabHistory = getPatientLabHistory ? getPatientLabHistory(selectedPatientId) : [];
+  const patientLabOrders = labOrders ? labOrders.filter(o => o.patientId === selectedPatientId) : [];
+  const patientLabAlerts = labAlerts ? labAlerts.filter(a => a.patientId === selectedPatientId) : [];
 
   // Handle adding clinical note inline
   const handleAddNote = (e) => {
@@ -207,6 +218,13 @@ export default function EmrPanel({ initialSelectedPatientId }) {
                 onClick={() => setActiveTab('billing')}
               >
                 Billing History ({patientInvoices.length})
+              </button>
+              <button 
+                className={`btn ${activeTab === 'laboratory' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: activeTab === 'laboratory' ? '3px solid var(--primary)' : 'none', padding: '10px 16px', fontSize: '13px', backgroundColor: activeTab === 'laboratory' ? 'var(--primary-light)' : 'transparent', color: activeTab === 'laboratory' ? 'var(--primary)' : 'var(--text-secondary)', boxShadow: 'none' }}
+                onClick={() => setActiveTab('laboratory')}
+              >
+                🔬 Laboratory ({patientLabHistory.length})
               </button>
             </div>
 
@@ -472,6 +490,154 @@ export default function EmrPanel({ initialSelectedPatientId }) {
                 ) : (
                   <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                     No invoice transactions recorded for this patient.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5: LABORATORY HISTORY (EMR-Linked Lab Reports) */}
+            {activeTab === 'laboratory' && (
+              <div>
+                {/* Critical Alerts for this Patient */}
+                {patientLabAlerts.length > 0 && (
+                  <div style={{ marginBottom: '20px', padding: '14px', border: '1.5px solid rgba(244, 63, 94, 0.3)', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(244, 63, 94, 0.03)' }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: '800', color: 'var(--rose)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🚨 Critical / Abnormal Value Alerts
+                      <span className="badge badge-rose" style={{ fontSize: '10px' }}>{patientLabAlerts.filter(a => !a.acknowledged).length} Unacknowledged</span>
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {patientLabAlerts.map(alert => (
+                        <div key={alert.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', borderLeft: `4px solid ${alert.severity === 'Critical' ? 'var(--rose)' : 'var(--amber)'}`, backgroundColor: 'var(--bg-primary)' }}>
+                          <div>
+                            <strong style={{ fontSize: '12.5px', color: 'var(--text-primary)' }}>{alert.parameter}</strong>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block' }}>Test: {alert.testName} | Value: <strong style={{ color: alert.severity === 'Critical' ? 'var(--rose)' : 'var(--amber)' }}>{alert.value}</strong> | Ref: {alert.refRange}</span>
+                            <small style={{ color: 'var(--text-muted)', fontSize: '10px' }}>{alert.createdAt}</small>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', color: alert.severity === 'Critical' ? 'var(--rose)' : 'var(--amber)' }}>{alert.severity}</span>
+                            {alert.acknowledged ? (
+                              <span style={{ fontSize: '10px', color: 'var(--emerald)', fontWeight: '700' }}>✓ Acknowledged</span>
+                            ) : (
+                              <button className="btn btn-secondary btn-sm" style={{ padding: '3px 8px', fontSize: '10px' }} onClick={() => acknowledgeCriticalAlert(alert.id, `Dr. ${doctorName}`)}>
+                                Acknowledge
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Lab Orders for this Patient */}
+                {patientLabOrders.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>📋 Active Laboratory Orders</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {patientLabOrders.map(order => {
+                        const statusColor = ['Verified', 'Report Generated', 'Report Delivered'].includes(order.status) ? 'var(--emerald)' : ['Processing', 'Analyzer Running', 'QC Verification'].includes(order.status) ? 'var(--indigo)' : 'var(--amber)';
+                        return (
+                          <div key={order.labOrderNumber} style={{ padding: '12px 14px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <strong style={{ fontSize: '12.5px', color: 'var(--primary)' }}>{order.labOrderNumber}</strong>
+                              <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', backgroundColor: `${statusColor}15`, color: statusColor }}>{order.status}</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                              <strong>Tests:</strong> {order.orderedTests.join(', ')}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Ordered: {order.orderTime}</span>
+                              <span>Priority: <strong>{order.priority || 'Routine'}</strong></span>
+                            </div>
+                            {(order.status === 'Report Generated' || order.status === 'Verified') && (
+                              <button 
+                                className="btn btn-primary btn-sm" 
+                                style={{ marginTop: '8px', padding: '4px 12px', fontSize: '11px' }}
+                                onClick={() => {
+                                  deliverLabReport(order.labOrderNumber, `Dr. ${doctorName}`);
+                                  alert(`Report for ${order.labOrderNumber} acknowledged as delivered.`);
+                                }}
+                              >
+                                ✓ Acknowledge Report Delivery
+                              </button>
+                            )}
+                            {order.status === 'Report Delivered' && (
+                              <div style={{ marginTop: '6px', fontSize: '10.5px', color: 'var(--emerald)', fontWeight: '600' }}>
+                                ✓ Delivered to {order.reportDeliveredTo} at {order.reportDeliveredAt}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Verified Lab Reports (One-Click Access from Medical History) */}
+                <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>📄 Laboratory Report History</h4>
+                {patientLabHistory.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {patientLabHistory.map((task, idx) => (
+                      <div key={`${task.taskId}-${idx}`} style={{ padding: '14px 16px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <div>
+                            <strong style={{ fontSize: '13px', color: 'var(--primary)' }}>{task.taskId}</strong>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: '10px' }}>
+                              Specimen: {task.specimenId}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', backgroundColor: task.status === 'Verified' || task.status === 'Report Generated' || task.status === 'Report Delivered' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: task.status === 'Verified' || task.status === 'Report Generated' || task.status === 'Report Delivered' ? 'var(--emerald)' : 'var(--amber)' }}>{task.status}</span>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                          <strong>Tests:</strong> {task.orderedTests.join(', ')}
+                        </div>
+
+                        {task.testResults && Object.keys(task.testResults).length > 0 && (
+                          <div style={{ marginTop: '8px', padding: '10px', backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Result Values</span>
+                            {Object.entries(task.testResults).map(([testName, resultObj]) => {
+                              if (!resultObj || !resultObj.val) return null;
+                              const isAbnormal = /high|low|critical|abnormal/i.test(resultObj.val);
+                              return (
+                                <div key={testName} style={{ marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px dashed var(--border-color)' }}>
+                                  <strong style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{testName}</strong>
+                                  <div style={{ fontSize: '11.5px', color: isAbnormal ? 'var(--amber)' : 'var(--text-secondary)', fontWeight: isAbnormal ? '600' : '400', marginTop: '2px' }}>
+                                    {resultObj.val}
+                                  </div>
+                                  <small style={{ color: 'var(--text-muted)', fontSize: '10px' }}>Machine: {resultObj.machine} | Completed: {resultObj.completedAt}</small>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <span>Doctor: {task.doctorName}</span>
+                          <span>Verified: {task.verifiedAt || 'Pending'} {task.verifiedBy ? `by ${task.verifiedBy}` : ''}</span>
+                        </div>
+                        {task.remarks && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: '4px', padding: '6px 8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px' }}>
+                            <strong>Remarks:</strong> {task.remarks}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <button className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={() => alert(`PDF Download initiated for ${task.taskId}`)}>
+                            📥 Download PDF
+                          </button>
+                          <button className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={() => { window.print(); }}>
+                            🖨️ Print Report
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    No laboratory reports found for this patient.
                   </div>
                 )}
               </div>
