@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useClinic } from '../context/ClinicContext';
 
 export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, onNavigateToTab }) {
@@ -15,6 +15,29 @@ export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, on
     nursingNotes,
     labRequests
   } = useClinic();
+
+  const [docPerfData, setDocPerfData] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeRole === 'admin') {
+      const fetchReports = async () => {
+        try {
+          setReportLoading(true);
+          const res = await fetch('/api/admin/reports');
+          if (res.ok) {
+            const data = await res.json();
+            setDocPerfData(data.doctorPerformance || []);
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setReportLoading(false);
+        }
+      };
+      fetchReports();
+    }
+  }, [activeRole]);
 
   // Dynamic values blended with screenshot base values to keep data interactive
   const totalPatientsToday = 125 + (patients.length - 5);
@@ -858,6 +881,43 @@ export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, on
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Clinician Performance Metrics (Admin Only) */}
+        {activeRole === 'admin' && (
+          <div className="panel-card col-12" style={{ padding: '20px', borderRadius: '16px', marginTop: '10px' }}>
+            <h4 style={{ fontFamily: 'var(--font-title)', fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '12px' }}>
+              🩺 Clinician Performance & Consultations Ledger
+            </h4>
+            {reportLoading ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loading clinician statistics...</div>
+            ) : docPerfData.length === 0 ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No clinician data recorded today.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="data-table" style={{ margin: 0, fontSize: '11.5px' }}>
+                  <thead>
+                    <tr>
+                      <th>Doctor Profile</th>
+                      <th style={{ textAlign: 'center' }}>OPD Tokens Issued</th>
+                      <th style={{ textAlign: 'center' }}>Consultations Completed</th>
+                      <th style={{ textAlign: 'center' }}>Prescriptions Issued</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {docPerfData.map((d, index) => (
+                      <tr key={index}>
+                        <td><strong>{d.doctorName}</strong></td>
+                        <td style={{ textAlign: 'center', fontWeight: '600' }}>{d.opdCount}</td>
+                        <td style={{ textAlign: 'center', color: 'var(--primary)', fontWeight: '700' }}>{d.completedCount}</td>
+                        <td style={{ textAlign: 'center' }}>{d.rxCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

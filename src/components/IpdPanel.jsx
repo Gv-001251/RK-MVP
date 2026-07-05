@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useClinic } from '../context/ClinicContext';
 
 export default function IpdPanel() {
@@ -18,6 +20,143 @@ export default function IpdPanel() {
   const [selectedBed, setSelectedBed] = useState('');
   const [diagnosisInput, setDiagnosisInput] = useState('');
   const [doctorInput, setDoctorInput] = useState('Dr. Anil Sharma');
+
+  const [showDischargeModal, setShowDischargeModal] = useState(false);
+  const [dischargePatientObj, setDischargePatientObj] = useState(null);
+  const [dischargeInpatientObj, setDischargeInpatientObj] = useState(null);
+  const [dischargeFormData, setDischargeFormData] = useState({
+    treatmentSummary: '',
+    labSummary: '',
+    medicinesSummary: '',
+    followUpDate: '',
+    followUpInstructions: '',
+    doctorNotes: '',
+    doctorName: 'Dr. Anil Sharma'
+  });
+
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferPatientId, setTransferPatientId] = useState('');
+  const [transferInpatientId, setTransferInpatientId] = useState('');
+  const [transferOldBedId, setTransferOldBedId] = useState('');
+  const [transferNewBedId, setTransferNewBedId] = useState('');
+  const [bedsList, setBedsList] = useState([]);
+
+  const fetchBeds = async () => {
+    try {
+      const res = await fetch('/api/beds');
+      if (res.ok) {
+        const data = await res.json();
+        setBedsList(data.beds || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (showTransferModal) {
+      fetchBeds();
+    }
+  }, [showTransferModal]);
+
+  const handleTransferSubmit = async (e) => {
+    e.preventDefault();
+    if (!transferNewBedId) return;
+    try {
+      const res = await fetch('/api/beds', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inpatientId: transferInpatientId,
+          patientId: transferPatientId,
+          oldBedId: transferOldBedId,
+          newBedId: transferNewBedId
+        })
+      });
+
+      if (res.ok) {
+        alert('Patient transferred successfully!');
+        setShowTransferModal(false);
+        window.location.reload();
+      } else {
+        alert('Transfer failed.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const downloadDischargePDF = (data) => {
+    const input = document.getElementById('discharge-summary-sheet');
+    if (!input) return;
+    html2canvas(input, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      pdf.save(`discharge-summary-${data.patientId}.pdf`);
+    });
+  };
+
+  const handleDischargeSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/discharge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: dischargePatientObj.id,
+          inpatientId: dischargeInpatientObj.id || null,
+          admissionDate: dischargeInpatientObj.date || new Date().toISOString(),
+          dischargeDate: new Date().toISOString(),
+          diagnosis: dischargeInpatientObj.diagnosis,
+          treatmentSummary: dischargeFormData.treatmentSummary,
+          labSummary: dischargeFormData.labSummary,
+          medicinesSummary: dischargeFormData.medicinesSummary,
+          followUpDate: dischargeFormData.followUpDate,
+          followUpInstructions: dischargeFormData.followUpInstructions,
+          doctorNotes: dischargeFormData.doctorNotes,
+          doctorName: dischargeFormData.doctorName
+        })
+      });
+
+      if (res.ok) {
+        if (dischargeInpatientObj.id) {
+          await fetch(`/api/inpatients/${dischargeInpatientObj.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'discharge', notes: dischargeFormData.doctorNotes })
+          });
+        }
+
+        // Trigger local context update if needed
+        dischargeInpatient(dischargePatientObj.id);
+
+        setTimeout(() => {
+          downloadDischargePDF({ patientId: dischargePatientObj.id });
+          setShowDischargeModal(false);
+          alert('Patient discharged successfully and summary report generated!');
+        }, 100);
+      } else {
+        alert('Failed to save discharge summary.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Simulated beds array (for allocation map)
   const beds = [
@@ -340,6 +479,7 @@ export default function IpdPanel() {
                       <th>Diagnosis</th>
                       <th>Vitals</th>
                       <th>Coverage</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -356,6 +496,20 @@ export default function IpdPanel() {
                             <span className={`badge ${ip.billing.includes('Covered') ? 'badge-emerald' : 'badge-amber'}`} style={{ fontSize: '10px' }}>
                               {ip.billing}
                             </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              onClick={() => {
+                                setTransferPatientId(ip.patientId);
+                                setTransferInpatientId(ip.id || '');
+                                setTransferOldBedId(ip.bed);
+                                setShowTransferModal(true);
+                              }}
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '750' }}
+                            >
+                              🔄 Transfer
+                            </button>
                           </td>
                         </tr>
                       )
@@ -556,10 +710,9 @@ export default function IpdPanel() {
                             <td>
                               <button 
                                 onClick={() => {
-                                  if (confirm(`Are you sure you want to discharge ${pat ? pat.name : 'this patient'}?`)) {
-                                    dischargeInpatient(ip.patientId);
-                                    alert("Patient discharged successfully!");
-                                  }
+                                  setDischargePatientObj(pat || { id: ip.patientId, name: 'Unknown' });
+                                  setDischargeInpatientObj(ip);
+                                  setShowDischargeModal(true);
                                 }}
                                 style={{
                                   padding: '5px 10px',
@@ -900,6 +1053,216 @@ export default function IpdPanel() {
 
           </div>
         </>
+      )}
+
+      {/* DISCHARGE SUMMARY MODAL */}
+      {showDischargeModal && dischargePatientObj && dischargeInpatientObj && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="panel-card" style={{ width: '850px', backgroundColor: 'var(--bg-primary)', borderRadius: '16px', padding: '24px', maxHeight: '90vh', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '20px' }}>
+            
+            {/* Form Section */}
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>✏️ Complete Discharge Summary Details</h3>
+              <form onSubmit={handleDischargeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Patient Name</label>
+                  <input type="text" className="form-control" value={dischargePatientObj.name} disabled />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Diagnosis (Initial)</label>
+                  <input type="text" className="form-control" value={dischargeInpatientObj.diagnosis} disabled />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Treatment / Procedure Summary *</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="2"
+                    value={dischargeFormData.treatmentSummary} 
+                    onChange={e => setDischargeFormData(p => ({ ...p, treatmentSummary: e.target.value }))}
+                    placeholder="e.g. Administered IV fluids, daily vitals monitored, chest pain subsided."
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Laboratory / Diagnostics Summary</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="2"
+                    value={dischargeFormData.labSummary} 
+                    onChange={e => setDischargeFormData(p => ({ ...p, labSummary: e.target.value }))}
+                    placeholder="e.g. CBC Hb: 13.5 g/dL, normal ECG run on admission."
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Prescribed Post-Discharge Medicines</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="2"
+                    value={dischargeFormData.medicinesSummary} 
+                    onChange={e => setDischargeFormData(p => ({ ...p, medicinesSummary: e.target.value }))}
+                    placeholder="e.g. Tab Metoprolol 50mg (1-0-1) for 14 Days"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Follow-up Date</label>
+                    <input 
+                      type="date" 
+                      className="form-control"
+                      value={dischargeFormData.followUpDate} 
+                      onChange={e => setDischargeFormData(p => ({ ...p, followUpDate: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Follow-up Instructions</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      value={dischargeFormData.followUpInstructions} 
+                      onChange={e => setDischargeFormData(p => ({ ...p, followUpInstructions: e.target.value }))}
+                      placeholder="e.g. Rest for 3 days, avoid heavy lifting."
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Discharging Physician Notes</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="2"
+                    value={dischargeFormData.doctorNotes} 
+                    onChange={e => setDischargeFormData(p => ({ ...p, doctorNotes: e.target.value }))}
+                    placeholder="General instructions or recovery advice..."
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowDischargeModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" style={{ backgroundColor: 'var(--rose)', borderColor: 'var(--rose)' }}>
+                    💾 Save & Export PDF
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* A4 Preview Container */}
+            <div style={{ overflowY: 'auto', maxHeight: '75vh', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', backgroundColor: '#f8fafc' }}>
+              <div id="discharge-summary-sheet" style={{ padding: '20px', backgroundColor: '#ffffff', color: '#1e293b', fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: '1.4' }}>
+                {/* Branding */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #0f172a', paddingBottom: '10px', marginBottom: '14px' }}>
+                  <div>
+                    <strong style={{ fontSize: '16px', color: '#0f172a' }}>RK CLINIC & HOSPITALS</strong><br />
+                    <span style={{ fontSize: '9px', color: '#64748b' }}>Multi-Specialty Healthcare & Inpatient Care | Hyderabad</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#db2777', border: '1px solid #db2777', padding: '3px 6px', borderRadius: '4px' }}>DISCHARGE SUMMARY</span>
+                  </div>
+                </div>
+
+                {/* Patient Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', borderBottom: '1px solid #cbd5e1', paddingBottom: '8px', marginBottom: '12px' }}>
+                  <div>
+                    <strong>Patient Name:</strong> {dischargePatientObj.name}<br />
+                    <strong>Age / Gender:</strong> {dischargePatientObj.age || 30} Y / {dischargePatientObj.gender || 'Male'}<br />
+                    <strong>Patient ID:</strong> {dischargePatientObj.id}
+                  </div>
+                  <div>
+                    <strong>Admission Date:</strong> {dischargeInpatientObj.date || 'Today'}<br />
+                    <strong>Discharge Date:</strong> {new Date().toLocaleDateString('en-GB')}<br />
+                    <strong>Room / Bed:</strong> {dischargeInpatientObj.bed}
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                  <div>
+                    <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Initial Diagnosis</strong>
+                    <span>{dischargeInpatientObj.diagnosis}</span>
+                  </div>
+                  <div>
+                    <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Treatment / Procedures Performed</strong>
+                    <span>{dischargeFormData.treatmentSummary || 'General recovery treatment under supervision.'}</span>
+                  </div>
+                  {dischargeFormData.labSummary && (
+                    <div>
+                      <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Diagnostics / Laboratory Findings</strong>
+                      <span>{dischargeFormData.labSummary}</span>
+                    </div>
+                  )}
+                  {dischargeFormData.medicinesSummary && (
+                    <div>
+                      <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Post-Discharge Prescriptions</strong>
+                      <span style={{ whiteSpace: 'pre-line' }}>{dischargeFormData.medicinesSummary}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Follow-up Date</strong>
+                      <span>{dischargeFormData.followUpDate || 'None scheduled'}</span>
+                    </div>
+                    <div>
+                      <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Follow-up Instructions</strong>
+                      <span>{dischargeFormData.followUpInstructions || 'Standard recovery precautions.'}</span>
+                    </div>
+                  </div>
+                  {dischargeFormData.doctorNotes && (
+                    <div>
+                      <strong style={{ display: 'block', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px', textTransform: 'uppercase', color: '#0f172a' }}>Physician's Closing Advice</strong>
+                      <span>{dischargeFormData.doctorNotes}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sign-off */}
+                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div>
+                    <span style={{ fontSize: '8.5px', color: '#64748b' }}>Discharge authorized digitally via EMR system logs.</span>
+                  </div>
+                  <div style={{ textAlign: 'right', borderTop: '1px solid #94a3b8', width: '150px', paddingTop: '6px' }}>
+                    <strong>{dischargeFormData.doctorName}</strong><br />
+                    <span style={{ fontSize: '9px', color: '#64748b' }}>Consulting Clinician</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* BED TRANSFER MODAL */}
+      {showTransferModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="panel-card" style={{ width: '450px', backgroundColor: 'var(--bg-primary)', borderRadius: '16px', padding: '24px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>🔄 Process Ward Bed Transfer</h3>
+            <form onSubmit={handleTransferSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Patient ID</label>
+                <input type="text" className="form-control" value={transferPatientId} disabled />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Current Assigned Bed</label>
+                <input type="text" className="form-control" value={transferOldBedId} disabled />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Select Target Vacant Bed *</label>
+                <select 
+                  className="form-control"
+                  value={transferNewBedId}
+                  onChange={e => setTransferNewBedId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Choose Vacant Bed --</option>
+                  {bedsList.filter(b => b.status === 'Available').map(b => (
+                    <option key={b.id} value={b.id}>{b.ward} - Bed {b.bed_number} ({b.bed_type})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowTransferModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Confirm Transfer</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

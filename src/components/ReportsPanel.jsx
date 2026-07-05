@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useClinic } from '../context/ClinicContext';
 
 export default function ReportsPanel() {
@@ -84,8 +86,33 @@ export default function ReportsPanel() {
     alert("Mock CSV Report exported successfully.");
   };
 
+  const downloadReportsPDF = () => {
+    const input = document.getElementById('reports-analytics-panel');
+    if (!input) return;
+    html2canvas(input, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      pdf.save(`reports-analytics-${reportRange}.pdf`);
+    });
+  };
+
   return (
-    <div className="content-panel active">
+    <div id="reports-analytics-panel" className="content-panel active" style={{ padding: '20px' }}>
       <div className="welcome-section">
         <div className="welcome-text">
           <h1>Clinical Analytics & Reports</h1>
@@ -105,6 +132,10 @@ export default function ReportsPanel() {
           <button className="btn btn-secondary" onClick={handleExportData}>
             <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: 'currentColor' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span>Export Raw CSV</span>
+          </button>
+          <button className="btn btn-primary" onClick={downloadReportsPDF} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: 'currentColor', strokeWidth: '2' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Download PDF Report</span>
           </button>
         </div>
       </div>

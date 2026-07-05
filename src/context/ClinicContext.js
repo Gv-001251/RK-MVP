@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+// Supabase removed — auth uses JWT cookies via /api/auth/*
 
 const ClinicContext = createContext();
 
@@ -420,54 +421,61 @@ export function ClinicProvider({ children }) {
   const [barcodeTracking, setBarcodeTracking] = useState({});
   // Shape: { [labOrderNumber]: { generated: bool, generatedAt: string, printed: bool, printedAt: string, barcodeValue: string } }
 
-  const login = (usernameOrEmail, password, selectedRole) => {
-    const trimmed = usernameOrEmail.trim().toLowerCase();
-    let resolvedRole = selectedRole || 'admin';
-    let resolvedName = '';
-
-    if (trimmed === 'admin@rkclinic.com' && password === 'admin@123') {
-      resolvedRole = 'admin';
-      resolvedName = 'Administrator';
-    } else if (trimmed === 'doc@rkclinic.com' && password === 'doc@123') {
-      resolvedRole = 'doctor';
-      resolvedName = 'Dr. Aditya Dev';
-    } else if (trimmed === 'medic@rkclinic.com' && password === 'medic@123') {
-      resolvedRole = 'nurse_pharmacy';
-      resolvedName = 'Nurse & Pharmacy';
-    } else if (trimmed === 'lab@rkclinic.com' && password === 'lab@123') {
-      resolvedRole = 'technician';
-      resolvedName = 'Lab Technician';
-    } else {
-      // Compatibility fallback for development/testing
-      if (trimmed === 'admin' || trimmed === 'admin_kareem') {
-        resolvedRole = 'admin';
-        resolvedName = 'Administrator';
-      } else if (trimmed === 'doctor' || trimmed === 'doctor_aditya') {
-        resolvedRole = 'doctor';
-        resolvedName = 'Dr. Aditya Dev';
-      } else if (trimmed === 'medic' || trimmed === 'pharmacy_suresh') {
-        resolvedRole = 'nurse_pharmacy';
-        resolvedName = 'Nurse & Pharmacy';
-      } else if (trimmed === 'lab' || trimmed === 'tech_suresh') {
-        resolvedRole = 'technician';
-        resolvedName = 'Lab Technician';
-      } else {
-        return false;
+  React.useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setUser({
+              username: data.user.fullName || data.user.email,
+              role: data.user.role,
+              email: data.user.email
+            });
+            setActiveRole(data.user.role);
+          }
+        }
+      } catch (err) {
+        console.error("Session check failed", err);
       }
-    }
-
-    const mockUser = {
-      username: resolvedName,
-      role: resolvedRole,
-      email: trimmed
     };
+    checkSession();
 
-    setUser(mockUser);
-    setActiveRole(mockUser.role);
-    return true;
+    // Realtime subscriptions removed (Supabase-specific).
+    // Poll /api/lab/alerts for critical alerts if needed.
+  }, []);
+
+  const login = async (usernameOrEmail, password, selectedRole) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: usernameOrEmail, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser({
+          username: data.user.fullName || data.user.email,
+          role: data.user.role,
+          email: data.user.email
+        });
+        setActiveRole(data.user.role);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Login failed", err);
+      return false;
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error(err);
+    }
     setUser(null);
     setActiveRole('admin');
   };

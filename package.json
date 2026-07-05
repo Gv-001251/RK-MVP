@@ -9,11 +9,19 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
+    "html2canvas": "^1.4.1",
+    "jose": "^6.2.3",
+    "jsonwebtoken": "^9.0.3",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.17.0",
+    "mysql2": "^3.22.5",
     "next": "16.2.7",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

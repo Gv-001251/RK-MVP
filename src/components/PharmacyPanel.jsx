@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+
 import { useClinic } from '../context/ClinicContext';
 
 export default function PharmacyPanel() {
@@ -32,6 +33,27 @@ export default function PharmacyPanel() {
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [billDiscountPercent, setBillDiscountPercent] = useState(0); // Global discount override
+
+  const handleUploadImage = async (medId, imageUrl) => {
+    // Supabase Storage removed — accept a hosted URL directly
+    try {
+      if (!imageUrl) { alert('Please enter a valid image URL.'); return; }
+      const res = await fetch(`/api/pharmacy/medicines/${medId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: imageUrl })
+      });
+      if (res.ok) {
+        alert('Medicine image URL saved successfully!');
+        window.location.reload();
+      } else {
+        alert('Failed to save image URL.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Update failed: ' + err.message);
+    }
+  };
 
   // Modal / overlays state
   const [showLoadPrescriptionModal, setShowLoadPrescriptionModal] = useState(false);
@@ -802,10 +824,31 @@ export default function PharmacyPanel() {
 
                   return (
                     <tr key={med.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: isOut ? 0.6 : 1 }}>
-                      <td>
-                        <strong>{parsed.name}</strong>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                          Batch: <code>{med.batchNumber || 'B-GEN' + med.id}</code>
+                      <td style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {med.image_url ? (
+                          <img 
+                            src={med.image_url} 
+                            alt={parsed.name} 
+                            style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--border-color)' }} 
+                          />
+                        ) : (
+                          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '4px', backgroundColor: 'var(--bg-primary)', border: '1.5px dashed var(--border-color)', margin: 0 }}>
+                            <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', stroke: 'var(--text-muted)', fill: 'none', strokeWidth: '2' }}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              style={{ display: 'none' }} 
+                              onChange={e => {
+                                if (e.target.files?.[0]) handleUploadImage(med.id, e.target.files[0]);
+                              }}
+                            />
+                          </label>
+                        )}
+                        <div>
+                          <strong>{parsed.name}</strong>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                            Batch: <code>{med.batchNumber || 'B-GEN' + med.id}</code>
+                          </div>
                         </div>
                       </td>
                       <td style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>{parsed.strength}</td>

@@ -28,6 +28,8 @@ import BackupPanel from '../components/BackupPanel';
 import SchedulerPanel from '../components/SchedulerPanel';
 import InsurancePanel from '../components/InsurancePanel';
 import SterilizationPanel from '../components/SterilizationPanel';
+import SuppliersPanel from '../components/SuppliersPanel';
+import EmergencyPanel from '../components/EmergencyPanel';
 
 export default function Home() {
   const {
@@ -151,6 +153,10 @@ export default function Home() {
         return <SchedulerPanel />;
       case 'insurance':
         return <InsurancePanel />;
+      case 'suppliers':
+        return <SuppliersPanel />;
+      case 'emergency':
+        return <EmergencyPanel />;
       case 'store':
         return (
           <div className="panel-card col-12" style={{ padding: '30px', textAlign: 'center' }}>

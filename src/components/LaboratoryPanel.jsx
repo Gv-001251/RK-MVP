@@ -3,6 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useClinic } from '../context/ClinicContext';
 import DoctorLaboratoryPanel from './DoctorLaboratoryPanel';
+import LabInventoryTab from './LabInventoryTab';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import QRCode from 'qrcode';
 
 const ANALYZERS_METADATA = [
   { id: 'maglumi', name: 'Maglumi 800', dept: 'Immunology (CLIA)' },
@@ -22,6 +26,20 @@ const getMachineForTest = (testName) => {
   if (nameLower.includes('electrolyte')) return ANALYZERS_METADATA.find(a => a.id === 'electrolyte');
   if (nameLower.includes('crp')) return ANALYZERS_METADATA.find(a => a.id === 'rapid');
   return ANALYZERS_METADATA.find(a => a.id === 'rapid'); // fallback
+};
+
+const SpecimenQRCode = ({ value }) => {
+  const canvasRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (canvasRef.current && value) {
+      QRCode.toCanvas(canvasRef.current, value, { width: 50, margin: 1 }, (err) => {
+        if (err) console.error(err);
+      });
+    }
+  }, [value]);
+
+  return <canvas ref={canvasRef} style={{ width: '50px', height: '50px', borderRadius: '4px' }} />;
 };
 
 export default function LaboratoryPanel() {
@@ -124,6 +142,31 @@ export default function LaboratoryPanel() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [selectedAnalyzerId, setSelectedAnalyzerId] = useState('');
+
+  const downloadReportPDF = () => {
+    const input = document.getElementById('lab-report-sheet');
+    if (!input) return;
+    html2canvas(input, { scale: 2 }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      pdf.save(`lab-report-${printedTaskData?.specimenId || 'specimen'}.pdf`);
+    });
+  };
 
   // Pathologist Verification states
   const [activeTaskForQC, setActiveTaskForQC] = useState(null);
@@ -690,20 +733,26 @@ export default function LaboratoryPanel() {
                       </div>
 
                       {barcodeGen && (
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', backgroundColor: 'var(--bg-surface)', padding: '8px', borderRadius: '6px', border: '1.5px dashed var(--border-color)', margin: '4px 0' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)' }}>PATIENT BARCODE</span>
-                            <span style={{ letterSpacing: '2px', fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: '#1e293b' }}>
-                              ||| {patientBarcode} |||
-                            </span>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', backgroundColor: 'var(--bg-surface)', padding: '8px 12px', borderRadius: '8px', border: '1.5px dashed var(--border-color)', margin: '4px 0' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '2px' }}>PATIENT ID</span>
+                              <span style={{ letterSpacing: '2px', fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: '#1e293b', fontSize: '10.5px' }}>
+                                ||| {patientBarcode} |||
+                              </span>
+                            </div>
+                            <SpecimenQRCode value={patientBarcode} />
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)' }}>SPECIMEN BARCODE</span>
-                            <span style={{ letterSpacing: '2px', fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: '#1e293b' }}>
-                              ||| {specimenBarcode} |||
-                            </span>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '2px' }}>SPECIMEN ID</span>
+                              <span style={{ letterSpacing: '2px', fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: '#1e293b', fontSize: '10.5px' }}>
+                                ||| {specimenBarcode} |||
+                              </span>
+                            </div>
+                            <SpecimenQRCode value={specimenBarcode} />
                           </div>
-                          {barcodePrn && <span style={{ fontSize: '11px', color: 'var(--emerald)', fontWeight: 'bold' }}>✓ Printed</span>}
+                          {barcodePrn && <span style={{ fontSize: '11px', color: 'var(--emerald)', fontWeight: 'bold', marginLeft: 'auto' }}>✓ Printed</span>}
                         </div>
                       )}
 
@@ -1629,6 +1678,8 @@ export default function LaboratoryPanel() {
             </div>
           </>
         );
+      case 'inventory':
+        return <LabInventoryTab />;
     }
   };
 
@@ -1636,7 +1687,8 @@ export default function LaboratoryPanel() {
     { id: 'dashboard', label: 'LIS Dashboard' },
     { id: 'registration', label: 'Assistant Workstation' },
     { id: 'results', label: 'Analyzer Port' },
-    { id: 'reports', label: 'Pathologist QC' }
+    { id: 'reports', label: 'Pathologist QC' },
+    { id: 'inventory', label: 'Lab Inventory' }
   ];
 
   // If the active role is doctor, render the doctor's redesigned patient-centric lab panel
@@ -1897,6 +1949,13 @@ export default function LaboratoryPanel() {
                   🖨️ Print Report
                 </button>
                 <button 
+                  onClick={downloadReportPDF} 
+                  className="btn btn-primary btn-sm"
+                  style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '750', backgroundColor: '#10b981', borderColor: '#10b981' }}
+                >
+                  📥 Download PDF
+                </button>
+                <button 
                   onClick={() => {
                     setShowPrintReportModal(false);
                     setPrintedTaskData(null);
@@ -1910,7 +1969,7 @@ export default function LaboratoryPanel() {
             </div>
 
             {/* A4 Printable Sheet Area */}
-            <div style={{ padding: '20px', border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#fcfcfc', fontFamily: 'Arial, sans-serif' }}>
+            <div id="lab-report-sheet" style={{ padding: '20px', border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#fcfcfc', fontFamily: 'Arial, sans-serif' }}>
               
               {/* Report Header Branding */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3.5px double #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>

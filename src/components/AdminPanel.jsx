@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useClinic } from '../context/ClinicContext';
 
 export default function AdminPanel() {
@@ -9,6 +9,31 @@ export default function AdminPanel() {
     addUser,
     deleteUser
   } = useClinic();
+
+  const [activeTab, setActiveTab] = useState('directory');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const fetchAuditLogs = async () => {
+    try {
+      setAuditLoading(true);
+      const res = await fetch('/api/admin/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data.auditLogs || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab]);
 
   const [formData, setFormData] = useState({
     username: '',
@@ -63,7 +88,7 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="content-panel active">
+    <div className="content-panel active" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div className="welcome-section">
         <div className="welcome-text">
           <h1>Clinic Employee & User Directory</h1>
@@ -71,8 +96,28 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      <div className="dashboard-grid">
-        {/* COLUMN 1: USER LIST DIRECTORY */}
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '10px', paddingBottom: '10px' }}>
+        <button 
+          onClick={() => setActiveTab('directory')}
+          className={`btn ${activeTab === 'directory' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: '700' }}
+        >
+          👥 Staff Directory
+        </button>
+        <button 
+          onClick={() => setActiveTab('audit')}
+          className={`btn ${activeTab === 'audit' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: '700' }}
+        >
+          📋 Security Audit Logs
+        </button>
+      </div>
+
+      {activeTab === 'directory' ? (
+        <>
+          <div className="dashboard-grid">
+          {/* COLUMN 1: USER LIST DIRECTORY */}
         <div className="panel-card col-8">
           <div className="panel-card-header">
             <h3 className="panel-card-title">Staff Members Directory ({users.length})</h3>
@@ -239,7 +284,55 @@ export default function AdminPanel() {
           </div>
         </div>
       </div>
-
+    </>
+  ) : (
+        /* AUDIT LOGS VIEW */
+        <div className="panel-card col-12" style={{ padding: '0px', borderRadius: '16px', overflow: 'hidden' }}>
+          <div className="panel-card-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)' }}>
+            <h3 className="panel-card-title">🔐 Enterprise Activity & Audit Trail</h3>
+          </div>
+          {auditLoading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Querying security audit logs...</div>
+          ) : auditLogs.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No audit log events found. All security logs are clear.</div>
+          ) : (
+            <div className="table-responsive">
+              <table className="data-table" style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Event Timestamp</th>
+                    <th>Operator Profile</th>
+                    <th>Action Signature</th>
+                    <th>Module Reference</th>
+                    <th>Entity Identifier</th>
+                    <th>IP Origin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map(log => (
+                    <tr key={log.id}>
+                      <td style={{ color: 'var(--text-secondary)' }}>{new Date(log.created_at || Date.now()).toLocaleString()}</td>
+                      <td><strong>{log.user_name || 'System Operator'}</strong></td>
+                      <td>
+                        <span className={`badge ${
+                          log.action.includes('CREATE') ? 'badge-emerald' : 
+                          log.action.includes('UPDATE') ? 'badge-amber' : 
+                          log.action.includes('DELETE') ? 'badge-rose' : 'badge-sky'
+                        }`}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td style={{ textTransform: 'capitalize' }}>{log.entity_type || 'Auth Log'}</td>
+                      <td><code style={{ fontSize: '11px' }}>{log.entity_id || '--'}</code></td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--text-muted)' }}>{log.ip_address || '127.0.0.1'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

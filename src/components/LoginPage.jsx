@@ -87,15 +87,15 @@ export default function LoginPage() {
     setErrorMsg('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username || !password) {
       setErrorMsg('Please enter both email and password.');
       return;
     }
-    const success = login(username, password, selectedRole);
+    const success = await login(username, password, selectedRole);
     if (!success) {
-      setErrorMsg('Invalid email or password for the selected role.');
+      setErrorMsg('Invalid email or password. Please verify your credentials.');
     } else {
       setErrorMsg('');
     }
