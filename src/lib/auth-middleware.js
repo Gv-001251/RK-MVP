@@ -7,8 +7,9 @@
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { query } from '@/lib/mysql/db';
+import { resolveJwtSecret } from '@/lib/auth-config';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+const JWT_SECRET = resolveJwtSecret();
 
 /**
  * Gets the current authenticated user and their profile from MySQL.
@@ -68,6 +69,37 @@ export async function requireRole(...allowedRoles) {
   }
 
   return null; // authorized
+}
+
+/**
+ * One-shot auth + RBAC for route handlers.
+ * Resolves the authenticated user/profile in a single DB lookup and, if
+ * `allowedRoles` is provided, enforces that the user holds one of them.
+ *
+ * Returns { user, profile, response }:
+ *   - if `response` is non-null, the caller must `return response` immediately
+ *     (401 when unauthenticated, 403 when the role is not permitted);
+ *   - otherwise `user` and `profile` are safe to use.
+ */
+export async function requireAuth(...allowedRoles) {
+  const { user, profile, error } = await getAuthenticatedUser();
+
+  if (error || !user) {
+    return { user: null, profile: null, response: Response.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+
+  if (allowedRoles.length && !allowedRoles.includes(profile.role)) {
+    return {
+      user,
+      profile,
+      response: Response.json(
+        { error: `Access denied. Required role: ${allowedRoles.join(' or ')}` },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { user, profile, response: null };
 }
 
 /**

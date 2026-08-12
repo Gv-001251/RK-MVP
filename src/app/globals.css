@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 /* 
    RK Clinic - Premium Healthcare Management System CSS
@@ -7,59 +7,69 @@
 
 
 :root {
-  /* Color System */
-  --bg-primary: #e2dbd5;
+  /* Color System — cool clinical neutrals */
+  --bg-primary: #eef2f8;
+  --bg-canvas: #eef2f8;
   --bg-surface: #ffffff;
-  --border-color: #e2e8f0;
+  --bg-subtle: #f6f8fc;
+  --border-color: #e6eaf2;
+  --border-strong: #d6dded;
 
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  /* 4.8:1 on white, passes WCAG AA */
+  --text-muted: #64748b;
 
-  /* Healthcare Accents */
+  /* Brand — Premium Indigo */
   --primary: #4f46e5;
-  /* Premium Indigo */
-  --primary-hover: #3730a3;
-  --primary-light: #e0e7ff;
+  --primary-hover: #4338ca;
+  --primary-dark: #3730a3;
+  --primary-light: #eef2ff;
+  --primary-soft: #e0e7ff;
+  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #4338ca 100%);
+  --brand-ring: rgba(79, 70, 229, 0.18);
 
-  --teal: #0fb77a;
-  --teal-hover: #0ca36c;
-  --teal-light: #e6f8f1;
+  /* Accents */
+  --teal: #0d9488;
+  --teal-hover: #0f766e;
+  --teal-light: #d5f5f0;
 
-  --emerald: #0fb77a;
-  --emerald-hover: #0ca36c;
-  --emerald-light: #e6f8f1;
+  --emerald: #059669;
+  --emerald-hover: #047857;
+  --emerald-light: #d6f5e6;
 
-  --rose: #f43f5e;
-  --rose-hover: #e11d48;
-  --rose-light: #ffe4e6;
+  --rose: #e11d48;
+  --rose-hover: #be123c;
+  --rose-light: #ffe4e9;
 
-  --amber: #f59e0b;
-  --amber-hover: #d97706;
-  --amber-light: #fef3c7;
+  --amber: #d97706;
+  --amber-hover: #b45309;
+  --amber-light: #fef1d6;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-  --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+  /* Shadows — layered, soft depth */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 2px 4px rgba(16, 24, 40, 0.04), 0 6px 16px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 10px 24px rgba(16, 24, 40, 0.08), 0 3px 8px rgba(16, 24, 40, 0.04);
+  --shadow-hover: 0 18px 36px rgba(79, 70, 229, 0.12), 0 6px 14px rgba(16, 24, 40, 0.06);
 
   /* Layout Constants */
   --sidebar-width: 260px;
   --header-height: 70px;
 
   /* Roundness */
-  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-lg: 18px;
   --radius-md: 12px;
-  --radius-sm: 8px;
+  --radius-sm: 9px;
+  --radius-pill: 999px;
 
   /* Fonts */
   --font-body: 'Inter', sans-serif;
   --font-title: 'Outfit', sans-serif;
 
   /* Transition speeds */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.25s ease;
+  --transition-fast: 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Dark Mode Variables Overlay */
@@ -170,6 +180,7 @@ aside.sidebar {
   letter-spacing: -0.5px;
   background: linear-gradient(135deg, var(--text-primary), var(--primary));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -890,6 +901,25 @@ header.top-header {
 .table-responsive {
   overflow-x: auto;
   width: 100%;
+  /* Momentum scrolling on iOS; without it a wide table feels stuck. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * On a phone, let a wide table stay wide and scroll rather than squashing its
+ * columns into something unreadable.
+ *
+ * `body` sets overflow-x: hidden, so anything wider than the viewport is CLIPPED
+ * rather than scrollable — a table that is not inside .table-responsive simply
+ * loses its right-hand columns, with no scrollbar to reveal that data exists. The
+ * wrapper is what makes the overflow scrollable instead of invisible, and this
+ * min-width is what stops eight columns collapsing into unreadable slivers on
+ * the way there.
+ */
+@media (max-width: 900px) {
+  .table-responsive > table {
+    min-width: 640px;
+  }
 }
 
 table.data-table {
@@ -2362,14 +2392,18 @@ dialog::backdrop {
   margin-left: 0 !important;
   width: 100% !important;
   min-height: 100vh;
-  background-color: #e2dbd5 !important;
-  background-image: none !important;
+  /* Clean, image-free canvas with only a whisper of brand tint for depth */
+  background:
+    radial-gradient(1100px 520px at 100% -8%, rgba(79, 70, 229, 0.045), transparent 62%),
+    radial-gradient(900px 460px at -6% 2%, rgba(13, 148, 136, 0.03), transparent 58%),
+    #f6f8fc !important;
+  background-attachment: fixed !important;
   display: flex;
   flex-direction: column;
 }
 
 body.dark-mode .app-container.no-sidebar main.main-content {
-  background-image: linear-gradient(135deg, rgba(10, 15, 30, 0.88) 0%, rgba(15, 22, 40, 0.93) 100%), url('/dna_bg.png');
+  background: #0b0f1a !important;
 }
 
 /* Translucent panels matching original functionality */
@@ -2381,25 +2415,22 @@ body.dark-mode .app-container.no-sidebar main.main-content {
 }
 
 .app-container.no-sidebar .panel-card {
-  background-color: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 8px 32px 0 rgba(79, 70, 229, 0.04);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
 }
 
 body.dark-mode .app-container.no-sidebar .panel-card {
-  background-color: rgba(18, 24, 38, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
 /* ERP Top Header Styles */
 .erp-header {
   height: var(--header-height);
-  background-color: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  background-color: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-color) !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3176,5 +3207,2060 @@ body.dark-mode .erp-card-detail-label {
   @page {
     size: A4 portrait;
     margin: 0; /* Clear margins to let .prescription-page control padding perfectly */
+  }
+}
+
+/* =========================================================
+   Accessibility & Interaction Foundation
+   Added to make the app easier to access (keyboard + screen
+   reader users) and easier to interact with (clear focus
+   feedback, motion preferences, comfortable targets).
+   ========================================================= */
+
+/* Visible keyboard focus for every interactive element.
+   `outline` is used intentionally: the inline style objects in
+   the JSX set background/border/color but never set `outline`,
+   so this focus ring stays visible even on inline-styled
+   buttons and clickable elements. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex="0"]:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Remove the legacy focus outline only when focus is not
+   keyboard-driven, so mouse clicks stay clean. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* The main content region is a skip-link target, not something
+   that should draw its own focus ring. */
+main.main-content:focus,
+main.main-content:focus-visible {
+  outline: none;
+}
+
+/* Screen-reader-only content: visually hidden but still announced. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link: off-screen until focused, then anchored top-left. */
+.skip-link {
+  position: fixed;
+  top: -200px;
+  left: 16px;
+  z-index: 1000;
+  padding: 12px 20px;
+  background-color: var(--primary);
+  color: #ffffff;
+  font-weight: 700;
+  font-family: var(--font-body);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  text-decoration: none;
+  transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+  top: 16px;
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* Consistent pointer + clear disabled affordance. */
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Tactile press feedback on the shared button component. */
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* Respect users who prefer reduced motion: neutralise the
+   heavy transitions/animations used across panels. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .status-pulse {
+    animation: none !important;
+  }
+}
+
+/* =========================================================
+   UI REFRESH LAYER  —  Professional visual system (v2)
+   Appended last so these rules win by source order.
+   Elevates the shared component classes used across every
+   panel (cards, buttons, tables, badges, forms, sidebar,
+   header) for a cohesive, premium, clinical look.
+   ========================================================= */
+
+/* ---- App canvas: soft cool depth instead of flat fill ---- */
+body {
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(1200px 600px at 8% -5%, rgba(99, 102, 241, 0.07), transparent 60%),
+    radial-gradient(1000px 560px at 105% 0%, rgba(13, 148, 136, 0.06), transparent 55%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Typography polish ---- */
+h1, h2, h3, .panel-card-title, .stats-card-value, .modal-title {
+  letter-spacing: -0.01em;
+}
+.sidebar-logo-hims {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+}
+
+/* ---- Sidebar ---- */
+aside.sidebar {
+  background-color: var(--bg-surface);
+  box-shadow: 1px 0 0 rgba(16, 24, 40, 0.02), 8px 0 24px -18px rgba(16, 24, 40, 0.25);
+}
+.sidebar-nav-group {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0 16px 6px;
+}
+.nav-item {
+  border-left: 3px solid transparent;
+  font-weight: 550;
+  border-radius: var(--radius-md);
+}
+.nav-item:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+}
+.nav-item:hover svg { stroke: var(--primary); }
+.nav-item.active {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  font-weight: 650;
+  border-left: 3px solid transparent;
+  box-shadow: 0 8px 18px -6px rgba(79, 70, 229, 0.55);
+}
+.nav-item.active svg { stroke: #ffffff; }
+
+/* ---- Header ---- */
+header.top-header {
+  background-color: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ---- Cards ---- */
+.panel-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.stats-card,
+.dashboard-grid .panel-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.stats-card {
+  position: relative;
+  overflow: hidden;
+}
+.stats-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--primary-gradient);
+  opacity: 0.9;
+}
+.stats-card.teal::before { background: linear-gradient(135deg, #2dd4bf, var(--teal)); }
+.stats-card.emerald::before { background: linear-gradient(135deg, #34d399, var(--emerald)); }
+.stats-card.rose::before { background: linear-gradient(135deg, #fb7185, var(--rose)); }
+.stats-card.amber::before { background: linear-gradient(135deg, #fbbf24, var(--amber)); }
+.stats-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-strong);
+}
+.stats-card-icon-wrapper { border-radius: var(--radius-md); }
+
+/* ---- Buttons ---- */
+.btn {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast), filter var(--transition-fast);
+}
+.btn-primary {
+  background: var(--primary-gradient);
+  border-color: transparent;
+  box-shadow: 0 8px 18px -8px rgba(79, 70, 229, 0.65);
+}
+.btn-primary:hover {
+  background: var(--primary-gradient);
+  filter: brightness(1.05);
+  box-shadow: 0 12px 24px -8px rgba(79, 70, 229, 0.7);
+  transform: translateY(-1px);
+}
+.btn-teal { box-shadow: 0 8px 18px -8px rgba(13, 148, 136, 0.6); }
+.btn-emerald { box-shadow: 0 8px 18px -8px rgba(5, 150, 105, 0.55); }
+.btn-rose { box-shadow: 0 8px 18px -8px rgba(225, 29, 72, 0.5); }
+.btn-teal:hover, .btn-emerald:hover, .btn-rose:hover { transform: translateY(-1px); filter: brightness(1.04); }
+.btn-secondary {
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+.btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--primary-light);
+}
+.btn-sm { padding: 7px 13px; font-size: 12.5px; border-radius: var(--radius-sm); }
+
+/* ---- Badges: softer, ringed pills ---- */
+.badge {
+  border-radius: var(--radius-pill);
+  padding: 4px 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+.badge-sky { background-color: var(--primary-light); color: var(--primary-dark); border-color: rgba(79, 70, 229, 0.18); }
+.badge-teal { background-color: var(--teal-light); color: var(--teal-hover); border-color: rgba(13, 148, 136, 0.2); }
+.badge-emerald { background-color: var(--emerald-light); color: var(--emerald-hover); border-color: rgba(5, 150, 105, 0.2); }
+.badge-rose { background-color: var(--rose-light); color: var(--rose-hover); border-color: rgba(225, 29, 72, 0.2); }
+.badge-amber { background-color: var(--amber-light); color: var(--amber-hover); border-color: rgba(217, 119, 6, 0.22); }
+.badge-indigo { background-color: var(--primary-light); color: var(--primary-dark); border-color: rgba(79, 70, 229, 0.18); }
+.badge-cyan { background-color: #d5f3fb; color: #0e7490; border-color: rgba(14, 116, 144, 0.2); }
+.badge-secondary { background-color: #eef1f7; color: var(--text-secondary); border-color: var(--border-color); }
+
+/* ---- Tables ---- */
+table.data-table th {
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-color);
+}
+table.data-table th:first-child { border-top-left-radius: var(--radius-md); }
+table.data-table th:last-child { border-top-right-radius: var(--radius-md); }
+table.data-table tbody tr:hover { background-color: var(--primary-light); }
+table.data-table td { border-bottom: 1px solid var(--border-color); }
+
+/* ---- Forms & search ---- */
+.form-control,
+.search-input {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+.form-control:focus,
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--brand-ring);
+  background-color: var(--bg-surface);
+}
+
+/* ---- Lists (queue / inventory) ---- */
+.queue-item,
+.inventory-item {
+  border-radius: var(--radius-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.queue-item:hover,
+.inventory-item:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.queue-token {
+  background: var(--primary-gradient);
+  color: #ffffff;
+}
+
+/* ---- Modals ---- */
+dialog {
+  border-radius: var(--radius-xl);
+  box-shadow: 0 30px 60px -18px rgba(16, 24, 40, 0.35);
+}
+dialog::backdrop {
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(5px);
+}
+.modal-header { border-bottom: 1px solid var(--border-color); }
+
+/* ---- Scrollbars ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb {
+  background: #c4cbda;
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #a9b2c6; background-clip: padding-box; }
+
+/* ---- Patient avatars pick up brand tint ---- */
+.patient-avatar,
+.patient-large-avatar {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+/* ---- Content fade-in for a smoother panel switch ---- */
+.content-body > * {
+  animation: uiFadeIn 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes uiFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .content-body > * { animation: none; }
+}
+
+/* ---- Dashboard cards (erp-dashboard-card) refresh ---- */
+.erp-dashboard-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.erp-dashboard-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--primary-gradient);
+  opacity: 0.85;
+}
+.erp-dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-strong);
+}
+.erp-card-large-number {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.erp-card-detail-item {
+  background-color: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
+
+/* ---- Analyzer status indicator (live machine dashboard) ---- */
+@keyframes lisPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(5, 150, 105, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+}
+.lis-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.lis-status-dot.is-active { animation: lisPulse 1.8s infinite; }
+.lis-machine-card {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.lis-machine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lis-status-dot.is-active { animation: none; }
+}
+
+/* ============================================================================
+   Critical Result Detection — alert banner
+   ========================================================================== */
+@keyframes critical-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.55); }
+  70%  { box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+}
+
+.critical-banner {
+  margin: 12px 30px 0 30px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md, 12px);
+  background: linear-gradient(90deg, #e11d48, #be123c);
+  color: #ffffff;
+  box-shadow: 0 10px 24px -10px rgba(225, 29, 72, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.critical-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.critical-banner-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: critical-pulse 1.6s infinite;
+  flex-shrink: 0;
+}
+
+.critical-banner-toggle {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.critical-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+}
+
+.critical-banner-sev {
+  display: inline-block;
+  background: #ffffff;
+  color: #be123c;
+  font-weight: 800;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  padding: 2px 7px;
+  margin-right: 8px;
+}
+
+.critical-banner-confirm {
+  background: #ffffff;
+  color: #be123c;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.critical-banner-confirm:hover { filter: brightness(0.96); }
+.critical-banner-confirm:disabled { opacity: 0.6; cursor: default; }
+
+/* ============================================================================
+   Laboratory report — print / PDF
+   ========================================================================== */
+@media print {
+  body.printing-report * { visibility: hidden !important; }
+  body.printing-report .lab-report,
+  body.printing-report .lab-report * { visibility: visible !important; }
+  body.printing-report .lab-report {
+    position: absolute !important;
+    left: 0; top: 0;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 14mm 12mm !important;
+    box-shadow: none !important;
+  }
+  body.printing-report .no-print { display: none !important; }
+  @page { size: A4 portrait; margin: 0; }
+}
+
+/* On-screen framing for the report viewer */
+.lab-report {
+  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+/* ============================================================================
+   Doctor Portal — responsive master-detail
+   ========================================================================== */
+.portal-split {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .portal-split { grid-template-columns: 1fr; }
+}
+
+/* =========================================================================
+   LIS DESIGN SYSTEM  (v3)
+   =========================================================================
+   The laboratory-only interface: a dark icon dock on a light canvas, white
+   cards with generous corners, and a soft periwinkle accent.
+
+   Appended last so it wins by source order over the earlier ERP and
+   "UI refresh v2" layers, which are kept intact for the parked hospital
+   modules in src/lib/legacy-modules.js.
+   ========================================================================= */
+
+:root {
+  /* Surfaces */
+  --lis-canvas: #f4f5f7;
+  --lis-surface: #ffffff;
+  --lis-surface-soft: #fafbfc;
+  --lis-dock: #17181c;
+  --lis-dock-raise: rgba(255, 255, 255, 0.07);
+  --lis-dock-ink: rgba(255, 255, 255, 0.62);
+
+  /* Ink */
+  --lis-ink: #17181c;
+  --lis-ink-mid: #4b5563;
+  --lis-ink-soft: #8b93a1;
+  --lis-line: #ecedf1;
+  --lis-line-strong: #e0e2e8;
+
+  /* Accents */
+  --lis-accent: #5c7cf5;
+  --lis-accent-deep: #4462e0;
+  --lis-accent-soft: #c2cff2;
+  --lis-accent-wash: #eef1fd;
+  --lis-pink: #f4b6c8;
+  --lis-green: #17a34a;
+  --lis-green-wash: #e7f7ed;
+  --lis-amber: #d98b0b;
+  --lis-amber-wash: #fdf3e0;
+  --lis-red: #dc2b4b;
+  --lis-red-wash: #fdeaee;
+
+  /* Geometry */
+  --lis-r-xl: 26px;
+  --lis-r-lg: 20px;
+  --lis-r-md: 14px;
+  --lis-r-sm: 10px;
+  --lis-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -12px rgba(16, 24, 40, 0.12);
+  --lis-shadow-raise: 0 2px 4px rgba(16, 24, 40, 0.05), 0 18px 40px -18px rgba(16, 24, 40, 0.2);
+
+  --lis-dock-width: 68px;
+  --lis-worklist-width: 258px;
+}
+
+body.dark-mode {
+  /* The dock is already near-black, so dark mode only shifts the workspace. */
+  --lis-canvas: #0b0d12;
+  --lis-surface: #15181f;
+  --lis-surface-soft: #1a1e26;
+  --lis-ink: #f4f6f9;
+  --lis-ink-mid: #c3cad6;
+  --lis-ink-soft: #8b93a1;
+  --lis-line: #242935;
+  --lis-line-strong: #2e3441;
+  --lis-accent-wash: #1c2338;
+  --lis-green-wash: #10251a;
+  --lis-amber-wash: #2a1f0c;
+  --lis-red-wash: #2c1219;
+}
+
+/* ── Canvas ─────────────────────────────────────────────────────────── */
+
+body {
+  background-color: var(--lis-canvas);
+  background-image: none;
+  color: var(--lis-ink);
+}
+
+/* ── Shell ──────────────────────────────────────────────────────────── */
+
+.lis-shell {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 16px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 100vh;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.lis-dock {
+  display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
+  gap: 0;
+  width: calc(var(--lis-dock-width) + var(--lis-worklist-width));
+  background-color: var(--lis-dock);
+  border-radius: var(--lis-r-xl);
+  padding: 14px 0;
+  position: sticky;
+  top: 16px;
+  align-self: flex-start;
+  height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.lis-dock.is-rail-only {
+  width: var(--lis-dock-width);
+}
+
+.lis-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1 1 auto;
+  /* Without this the wide LIS tables force the whole shell to overflow. */
+  min-width: 0;
+}
+
+main.lis-workspace:focus,
+main.lis-workspace:focus-visible {
+  outline: none;
+}
+
+.lis-panel-area {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+/* ── Navigation rail ────────────────────────────────────────────────── */
+
+.lis-rail {
+  width: var(--lis-dock-width);
+  flex: 0 0 var(--lis-dock-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+.lis-rail-brand {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--lis-r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lis-dock);
+  background-color: #ffffff;
+  flex: 0 0 auto;
+}
+
+.lis-rail-scroll {
+  flex: 1 1 auto;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* The tooltips escape the rail, so no horizontal clipping here. */
+  scrollbar-width: none;
+}
+
+.lis-rail-scroll::-webkit-scrollbar {
+  width: 0;
+}
+
+.lis-rail-group.has-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding-top: 10px;
+}
+
+.lis-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.lis-rail-foot {
+  flex: 0 0 auto;
+  width: 100%;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.lis-rail-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--lis-r-md);
+  background-color: transparent;
+  color: var(--lis-dock-ink);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.lis-rail-btn:hover {
+  background-color: var(--lis-dock-raise);
+  color: #ffffff;
+}
+
+.lis-rail-btn.is-active {
+  background-color: var(--lis-accent);
+  color: #ffffff;
+}
+
+.lis-rail-btn.is-danger:hover {
+  background-color: rgba(220, 43, 75, 0.22);
+  color: #ffc9d3;
+}
+
+/* Tooltip label, on hover and on keyboard focus. */
+.lis-rail-btn::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border-radius: var(--lis-r-sm);
+  background-color: var(--lis-ink);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+  z-index: 40;
+  box-shadow: var(--lis-shadow-raise);
+}
+
+.lis-rail-btn:hover::after,
+.lis-rail-btn:focus-visible::after {
+  opacity: 1;
+}
+
+/* ── Worklist column ────────────────────────────────────────────────── */
+
+.lis-worklist {
+  width: var(--lis-worklist-width);
+  flex: 0 0 var(--lis-worklist-width);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 14px 0 2px;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.lis-calendar {
+  background-color: var(--lis-surface);
+  border-radius: var(--lis-r-lg);
+  padding: 14px;
+  flex: 0 0 auto;
+}
+
+/* Keep the calendar readable as a raised panel on the near-black dock. */
+body.dark-mode .lis-calendar {
+  background-color: #1e232e;
+}
+
+.lis-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lis-calendar-title {
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lis-ink);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.lis-calendar-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.lis-calendar-nav button {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lis-line);
+  border-radius: 50%;
+  background-color: var(--lis-surface);
+  color: var(--lis-ink-mid);
+}
+
+.lis-calendar-nav button:hover {
+  border-color: var(--lis-accent);
+  color: var(--lis-accent);
+}
+
+.lis-calendar-month {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lis-ink-soft);
+  margin: 8px 0 6px;
+}
+
+.lis-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.lis-calendar-weekday {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lis-ink-soft);
+  text-align: center;
+  padding-bottom: 4px;
+}
+
+.lis-calendar-day {
+  aspect-ratio: 1;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--lis-ink-mid);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.lis-calendar-day:hover {
+  background-color: var(--lis-accent-wash);
+  color: var(--lis-accent-deep);
+}
+
+.lis-calendar-day.is-outside {
+  color: var(--lis-ink-soft);
+  opacity: 0.5;
+}
+
+.lis-calendar-day.is-today {
+  color: var(--lis-accent-deep);
+  background-color: var(--lis-accent-wash);
+}
+
+.lis-calendar-day.is-selected {
+  background-color: var(--lis-accent);
+  color: #ffffff;
+}
+
+.lis-worklist-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--lis-r-lg);
+  background-color: var(--lis-dock-raise);
+  color: #ffffff;
+  text-align: left;
+  transition: background-color var(--transition-fast);
+  flex: 0 0 auto;
+}
+
+.lis-worklist-summary:hover {
+  background-color: rgba(255, 255, 255, 0.13);
+}
+
+.lis-worklist-count {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.lis-worklist-caption {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  flex: 1 1 auto;
+}
+
+.lis-worklist-go {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: var(--lis-dock);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.lis-worklist-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+}
+
+.lis-worklist-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lis-worklist-empty {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 10px 4px;
+  margin: 0;
+}
+
+.lis-worklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: var(--lis-r-md);
+  transition: background-color var(--transition-fast);
+}
+
+.lis-worklist-item:hover {
+  background-color: var(--lis-dock-raise);
+}
+
+.lis-worklist-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.lis-worklist-avatar.is-urgent {
+  background-color: rgba(220, 43, 75, 0.28);
+  color: #ffd2da;
+}
+
+.lis-worklist-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lis-worklist-name,
+.lis-worklist-test {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lis-worklist-name {
+  font-size: 12px;
+  font-weight: 650;
+  color: #ffffff;
+}
+
+.lis-worklist-test {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.lis-worklist-time {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.lis-worklist-done {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--lis-green);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* ── Top bar ────────────────────────────────────────────────────────── */
+
+.lis-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 6px 4px 0;
+}
+
+.lis-greeting-title {
+  font-family: var(--font-title);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--lis-ink);
+  margin: 0;
+  letter-spacing: -0.025em;
+}
+
+.lis-greeting-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lis-ink-soft);
+  margin: 4px 0 0;
+}
+
+.lis-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lis-round-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--lis-line);
+  background-color: var(--lis-surface);
+  color: var(--lis-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.lis-round-btn:hover {
+  border-color: var(--lis-accent-soft);
+  box-shadow: var(--lis-shadow);
+}
+
+.lis-round-btn.is-profile {
+  background-color: var(--lis-ink);
+  border-color: var(--lis-ink);
+  color: #ffffff;
+}
+
+.lis-round-btn-dot {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--lis-green);
+  border: 1.5px solid var(--lis-surface);
+}
+
+.lis-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lis-search-input {
+  width: 236px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--lis-line);
+  border-radius: var(--radius-pill);
+  background-color: var(--lis-surface);
+  color: var(--lis-ink);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  outline: none;
+}
+
+.lis-search-input:focus {
+  border-color: var(--lis-accent);
+  box-shadow: 0 0 0 3px rgba(92, 124, 245, 0.16);
+}
+
+.lis-menu-anchor {
+  position: relative;
+}
+
+.lis-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 236px;
+  padding: 12px;
+  background-color: var(--lis-surface);
+  border: 1px solid var(--lis-line);
+  border-radius: var(--lis-r-lg);
+  box-shadow: var(--lis-shadow-raise);
+  z-index: 120;
+}
+
+.lis-menu.is-wide {
+  width: 250px;
+}
+
+.lis-menu-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--lis-ink-soft);
+  margin: 0 0 8px;
+}
+
+.lis-menu-empty {
+  font-size: 11.5px;
+  color: var(--lis-ink-soft);
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.lis-menu-note {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--lis-line);
+}
+
+.lis-menu-note:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.lis-menu-note-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--lis-ink);
+}
+
+.lis-menu-note-head span:last-child {
+  color: var(--lis-ink-soft);
+  font-weight: 600;
+}
+
+.lis-menu-note p {
+  font-size: 11px;
+  color: var(--lis-ink-mid);
+  margin: 3px 0 0;
+  line-height: 1.4;
+}
+
+.lis-menu-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--lis-line);
+}
+
+.lis-menu-identity-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lis-ink);
+}
+
+.lis-menu-identity-role {
+  font-size: 11px;
+  color: var(--lis-ink-soft);
+}
+
+.lis-menu-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.lis-menu-role {
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--lis-r-sm);
+  background-color: transparent;
+  color: var(--lis-ink-mid);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.lis-menu-role:hover {
+  background-color: var(--lis-accent-wash);
+  color: var(--lis-accent-deep);
+}
+
+.lis-menu-role.is-active {
+  background-color: var(--lis-accent);
+  color: #ffffff;
+}
+
+.lis-menu-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--lis-red-wash);
+  border-radius: var(--lis-r-sm);
+  background-color: var(--lis-red-wash);
+  color: var(--lis-red);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.lis-menu-signout:hover {
+  background-color: var(--lis-red);
+  border-color: var(--lis-red);
+  color: #ffffff;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+
+.lis-card,
+.app-container.no-sidebar .panel-card,
+.panel-card {
+  background-color: var(--lis-surface);
+  border: 1px solid var(--lis-line);
+  border-radius: var(--lis-r-xl);
+  box-shadow: var(--lis-shadow);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lis-card {
+  gap: 14px;
+}
+
+.panel-card:hover {
+  /* The old refresh layer lifted every card on hover, which fought with the
+     tables and drawers inside them. */
+  transform: none;
+  box-shadow: var(--lis-shadow);
+}
+
+.lis-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lis-card-title {
+  font-family: var(--font-title);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--lis-ink-mid);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.lis-card-title.is-lg {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--lis-ink);
+}
+
+.lis-card-action {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--lis-line);
+  background-color: var(--lis-surface);
+  color: var(--lis-ink-mid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.lis-card-action:hover {
+  border-color: var(--lis-accent);
+  color: var(--lis-accent);
+}
+
+.lis-card-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--lis-ink-mid);
+  background-color: var(--lis-surface-soft);
+  border: 1px solid var(--lis-line);
+  border-radius: var(--radius-pill);
+  padding: 4px 11px;
+}
+
+.lis-card-empty {
+  font-size: 12.5px;
+  color: var(--lis-ink-soft);
+  margin: 0;
+  padding: 22px 0;
+  text-align: center;
+}
+
+.lis-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--lis-accent-deep);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lis-text-btn:hover {
+  text-decoration: underline;
+}
+
+.lis-select select {
+  appearance: none;
+  border: 1px solid var(--lis-line);
+  border-radius: var(--radius-pill);
+  background-color: var(--lis-surface);
+  color: var(--lis-ink-mid);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 6px 26px 6px 12px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--lis-ink-soft) 50%),
+                    linear-gradient(135deg, var(--lis-ink-soft) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 52%, calc(100% - 10px) 52%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.lis-select select:focus-visible {
+  border-color: var(--lis-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(92, 124, 245, 0.16);
+}
+
+.lis-state-card {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 220px;
+  font-size: 13px;
+  color: var(--lis-ink-soft);
+}
+
+.lis-state-error {
+  color: var(--lis-red);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ── Dashboard ──────────────────────────────────────────────────────── */
+
+.lis-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.lis-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.lis-chart-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.lis-kpi {
+  justify-content: space-between;
+}
+
+.lis-kpi-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-family: var(--font-title);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--lis-ink);
+  letter-spacing: -0.03em;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.lis-kpi-value.is-accent {
+  color: var(--lis-amber);
+}
+
+.lis-kpi-unit,
+.lis-kpi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background-color: var(--lis-accent-wash);
+  color: var(--lis-accent-deep);
+}
+
+.lis-kpi-pill {
+  background-color: var(--lis-amber-wash);
+  color: var(--lis-amber);
+}
+
+.lis-kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background-color: var(--lis-green-wash);
+  color: var(--lis-green);
+}
+
+.lis-kpi-delta.is-down {
+  background-color: var(--lis-red-wash);
+  color: var(--lis-red);
+}
+
+.lis-kpi-delta-note {
+  font-weight: 600;
+  color: var(--lis-ink-soft);
+}
+
+.lis-kpi-foot {
+  font-size: 11.5px;
+  color: var(--lis-ink-soft);
+  margin: 0;
+}
+
+.lis-split-bar {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.lis-split-bar span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  min-width: 2px;
+}
+
+.lis-split-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lis-ink-soft);
+}
+
+.lis-split-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lis-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* Volume chart */
+
+.lis-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lis-chart-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.lis-chart-svg rect {
+  transition: fill var(--transition-fast);
+}
+
+.lis-chart-label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--lis-ink-soft);
+}
+
+.lis-chart-label.is-active {
+  fill: var(--lis-ink);
+  font-weight: 700;
+}
+
+.lis-chart-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+}
+
+.lis-chart-readout-value {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--lis-ink);
+  letter-spacing: -0.02em;
+}
+
+.lis-chart-readout-unit {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lis-ink-soft);
+}
+
+.lis-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lis-ink-soft);
+}
+
+/* Workload gauge */
+
+.lis-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.lis-gauge-svg {
+  width: 100%;
+  max-width: 230px;
+  height: auto;
+}
+
+.lis-gauge-track {
+  fill: none;
+  stroke: var(--lis-line);
+}
+
+.lis-gauge-value {
+  font-family: var(--font-title);
+  font-size: 30px;
+  font-weight: 700;
+  fill: var(--lis-ink);
+  letter-spacing: -0.03em;
+}
+
+.lis-gauge-caption {
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  fill: var(--lis-ink-soft);
+}
+
+.lis-gauge-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.lis-gauge-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.lis-gauge-legend-value {
+  font-weight: 700;
+  color: var(--lis-ink);
+  min-width: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lis-gauge-legend-label {
+  color: var(--lis-ink-soft);
+  font-weight: 600;
+}
+
+/* Table extras */
+
+.lis-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lis-person-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--lis-accent-wash);
+  color: var(--lis-accent-deep);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.lis-person-name {
+  font-weight: 650;
+  color: var(--lis-ink);
+}
+
+.lis-mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--lis-ink-mid);
+}
+
+.lis-report-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--lis-ink-soft);
+}
+
+.lis-report-state.is-ready {
+  color: var(--lis-green);
+}
+
+.lis-report-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--lis-line-strong);
+}
+
+.lis-table tbody tr {
+  cursor: default;
+}
+
+/* ── Shared component restyle (applies to every LIS panel) ──────────── */
+
+.lis-workspace .btn,
+.btn {
+  border-radius: var(--lis-r-md);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.btn-primary {
+  background: var(--lis-accent);
+  background-image: none;
+  border-color: var(--lis-accent);
+  box-shadow: none;
+}
+
+.btn-primary:hover {
+  background: var(--lis-accent-deep);
+  background-image: none;
+  filter: none;
+  transform: none;
+  box-shadow: 0 8px 18px -10px rgba(68, 98, 224, 0.7);
+}
+
+.btn-secondary {
+  background-color: var(--lis-surface);
+  border: 1px solid var(--lis-line-strong);
+  color: var(--lis-ink-mid);
+  box-shadow: none;
+}
+
+.btn-secondary:hover {
+  background-color: var(--lis-accent-wash);
+  border-color: var(--lis-accent-soft);
+  color: var(--lis-accent-deep);
+}
+
+.btn-teal,
+.btn-emerald,
+.btn-rose {
+  box-shadow: none;
+}
+
+.btn-teal:hover,
+.btn-emerald:hover,
+.btn-rose:hover {
+  transform: none;
+  filter: brightness(1.03);
+}
+
+/* Badges: soft pills in sentence case, matching the reference status chips. */
+.badge {
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  border: none;
+}
+
+.badge-sky,
+.badge-indigo {
+  background-color: var(--lis-accent-wash);
+  color: var(--lis-accent-deep);
+}
+
+.badge-emerald,
+.badge-teal {
+  background-color: var(--lis-green-wash);
+  color: var(--lis-green);
+}
+
+.badge-amber {
+  background-color: var(--lis-amber-wash);
+  color: var(--lis-amber);
+}
+
+.badge-rose {
+  background-color: var(--lis-red-wash);
+  color: var(--lis-red);
+}
+
+.badge-secondary,
+.badge-cyan {
+  background-color: var(--lis-surface-soft);
+  color: var(--lis-ink-mid);
+  border: 1px solid var(--lis-line);
+}
+
+/* Tables */
+table.data-table th {
+  padding: 10px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lis-ink-soft);
+  background-color: transparent;
+  border-bottom: 1px solid var(--lis-line);
+}
+
+table.data-table td {
+  padding: 13px 14px;
+  font-size: 12.5px;
+  color: var(--lis-ink-mid);
+  border-bottom: 1px solid var(--lis-line);
+}
+
+table.data-table th:first-child,
+table.data-table td:first-child {
+  padding-left: 4px;
+}
+
+table.data-table th:last-child,
+table.data-table td:last-child {
+  padding-right: 4px;
+}
+
+table.data-table tbody tr:hover {
+  background-color: var(--lis-surface-soft);
+}
+
+/* Forms */
+.form-control {
+  border-radius: var(--lis-r-md);
+  border: 1px solid var(--lis-line-strong);
+  background-color: var(--lis-surface);
+  color: var(--lis-ink);
+  font-size: 13px;
+}
+
+.form-control:focus {
+  border-color: var(--lis-accent);
+  box-shadow: 0 0 0 3px rgba(92, 124, 245, 0.16);
+}
+
+.form-label {
+  color: var(--lis-ink-mid);
+  font-weight: 650;
+}
+
+/* Panel headings inside the existing LIS panels. */
+.lis-panel-area h2 {
+  letter-spacing: -0.02em;
+}
+
+/* The lab bench panel roots a 12-column grid whose stock margins were tuned
+   for the old page padding. The shell now owns the outer spacing. */
+.lis-panel-area .dashboard-grid {
+  margin-top: 0;
+  margin-bottom: 0;
+  gap: 16px;
+}
+
+/* Stat cards used by a few panels: drop the gradient top bar. */
+.stats-card::before {
+  display: none;
+}
+
+.stats-card,
+.erp-dashboard-card {
+  border-radius: var(--lis-r-xl);
+  border: 1px solid var(--lis-line);
+  box-shadow: var(--lis-shadow);
+  background-color: var(--lis-surface);
+}
+
+.stats-card:hover,
+.erp-dashboard-card:hover {
+  transform: none;
+  box-shadow: var(--lis-shadow-raise);
+  border-color: var(--lis-line-strong);
+}
+
+/* The critical alert banner sits between the top bar and the panel. */
+.critical-banner {
+  border-radius: var(--lis-r-lg);
+}
+
+/* Focus ring, consistent across the new controls. */
+.lis-rail-btn:focus-visible,
+.lis-round-btn:focus-visible,
+.lis-card-action:focus-visible,
+.lis-calendar-day:focus-visible,
+.lis-calendar-nav button:focus-visible,
+.lis-worklist-summary:focus-visible,
+.lis-menu-role:focus-visible,
+.lis-menu-signout:focus-visible,
+.lis-text-btn:focus-visible {
+  outline: 2px solid var(--lis-accent);
+  outline-offset: 2px;
+}
+
+.lis-rail-btn:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+
+@media (max-width: 1440px) {
+  .lis-chart-row {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1280px) {
+  /* Give the wide laboratory tables the full width. */
+  .lis-dock,
+  .lis-dock.is-rail-only {
+    width: var(--lis-dock-width);
+  }
+
+  .lis-worklist {
+    display: none;
+  }
+
+  .lis-chart-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .lis-shell {
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .lis-dock,
+  .lis-dock.is-rail-only {
+    width: 100%;
+    height: auto;
+    position: static;
+    padding: 10px 12px;
+    border-radius: var(--lis-r-lg);
+  }
+
+  .lis-rail {
+    width: 100%;
+    flex: 1 1 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+  }
+
+  .lis-rail-scroll {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 10px;
+  }
+
+  .lis-rail-group.has-divider {
+    border-top: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.09);
+    padding-top: 0;
+    padding-left: 10px;
+  }
+
+  .lis-rail-list {
+    flex-direction: row;
+  }
+
+  .lis-rail-foot {
+    padding-top: 0;
+    padding-left: 10px;
+    border-top: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.09);
+    width: auto;
+  }
+
+  /* On a horizontal rail the tooltip belongs underneath. */
+  .lis-rail-btn::after {
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+  }
+
+  .lis-kpi-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lis-greeting-title {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 620px) {
+  .lis-topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lis-search.is-open {
+    flex: 1 1 auto;
+  }
+
+  .lis-search-input {
+    width: 100%;
+  }
+}
+
+/* ── Print ──────────────────────────────────────────────────────────── */
+
+@media print {
+  .lis-shell,
+  .lis-dock,
+  .lis-topbar {
+    display: none !important;
   }
 }

@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * DEPRECATED — superseded by `components/lis/LisTopBar`.
+ *
+ * The old top bar. Its `navItems` / `getVisibleNavItems()` block was dead code
+ * that still advertised OPD, IPD, Pharmacy and Billing long after those panels
+ * left the navigation — the drift that motivated the central nav model in
+ * `src/lib/lis-navigation.js`.
+ *
+ * Nothing imports this file. Safe to delete once the new bar has shipped.
+ */
+
 import React, { useState } from 'react';
 import { useClinic } from '../context/ClinicContext';
 
@@ -13,8 +24,6 @@ export default function Header({
     setActiveRole, 
     nursingNotes,
     user,
-    setLabActiveTab,
-    setIpdActiveTab,
     logout
   } = useClinic();
 
@@ -26,7 +35,10 @@ export default function Header({
     admin: 'Administrator',
     doctor: 'Doctor (MD)',
     nurse_pharmacy: 'Nurse & Pharmacy',
-    technician: 'Laboratory Technician'
+    technician: 'Laboratory Technician',
+    senior_technician: 'Senior Technician',
+    pathologist: 'Pathologist',
+    receptionist: 'Receptionist'
   };
   const roleDisplay = roleDisplayMap[activeRole] || activeRole;
 
@@ -116,6 +128,8 @@ export default function Header({
       case 'nurse_pharmacy':
         return navItems.filter(item => ['dashboard', 'opd', 'ipd', 'pharmacy'].includes(item.id));
       case 'technician':
+      case 'senior_technician':
+      case 'pathologist':
         return navItems.filter(item => ['dashboard', 'laboratory'].includes(item.id));
       case 'admin':
       default:
@@ -128,18 +142,17 @@ export default function Header({
   const handleRoleChange = (role) => {
     setActiveRole(role);
     setShowProfileMenu(false);
-    // Reset active view panel to dashboard to prevent crash if panel isn't permitted in new role
-    if (role === 'technician') {
-      setLabActiveTab('dashboard');
-      setActivePanel('laboratory');
-    } else if (role === 'nurse_pharmacy') {
-      setIpdActiveTab('dashboard');
-      setActivePanel('dashboard');
-    } else if (role === 'doctor') {
-      setActivePanel('consultation');
-    } else {
-      setActivePanel('dashboard');
-    }
+    // Land on the role's primary screen (matches the role-scoped navigation).
+    const landing = {
+      admin: 'dashboard',
+      doctor: 'doctor_portal',
+      technician: 'dashboard',
+      senior_technician: 'dashboard',
+      pathologist: 'verification',
+      receptionist: 'order_entry',
+      nurse_pharmacy: 'sample_collection',
+    };
+    setActivePanel(landing[role] || 'dashboard');
   };
 
   return (
@@ -147,20 +160,25 @@ export default function Header({
       
       {/* LEFT: Profile toggle pill */}
       <div className="header-profile-section" style={{ position: 'relative' }}>
-        <div 
+        <button 
+          type="button"
           className="user-profile-menu-erp" 
           onClick={() => setShowProfileMenu(!showProfileMenu)}
+          aria-haspopup="true"
+          aria-expanded={showProfileMenu}
           style={{
-            backgroundColor: '#eae6e3',
-            border: 'none',
+            backgroundColor: '#ffffff',
+            border: '1.5px solid rgba(0, 0, 0, 0.08)',
             borderRadius: '24px',
-            padding: '4px 12px 4px 6px',
+            padding: '4px 14px 4px 6px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
             cursor: 'pointer',
-            boxShadow: 'none',
-            height: '42px'
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+            height: '42px',
+            font: 'inherit',
+            textAlign: 'left'
           }}
           title={canSwitchRole ? "Switch Active Role" : "User Profile"}
         >
@@ -169,26 +187,26 @@ export default function Header({
             src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=150&auto=format&fit=crop" 
             alt="User Avatar" 
             className="user-avatar-erp" 
-            style={{ width: '30px', height: '30px', borderRadius: '50%' }}
+            style={{ width: '32px', height: '32px', borderRadius: '50%' }}
           />
-          <div className="user-info-erp" style={{ gap: '0px' }}>
-            <span className="user-name-erp" style={{ fontSize: '11.5px', fontWeight: '700', color: '#1e293b' }}>{user ? user.username : 'RK Clinic User'}</span>
-            <span className="user-role-erp" style={{ fontSize: '9px', fontWeight: '600', color: '#4f46e5' }}>{roleDisplay}</span>
-          </div>
+          <span className="user-info-erp" style={{ gap: '1px', display: 'flex', flexDirection: 'column' }}>
+            <span className="user-name-erp" style={{ fontSize: '12px', fontWeight: '800', color: '#1e293b', lineHeight: '1.1' }}>{user ? user.username.split('@')[0] : 'Oliver Jack'}</span>
+            <span className="user-role-erp" style={{ fontSize: '9.5px', fontWeight: '600', color: '#64748b', lineHeight: '1.1' }}>{roleDisplay}</span>
+          </span>
           
-          {canSwitchRole && (
-            <div 
-              style={{
-                width: '0',
-                height: '0',
-                borderLeft: '4px solid transparent',
-                borderRight: '4px solid transparent',
-                borderTop: '5px solid #64748b',
-                marginLeft: '4px'
-              }}
-            />
-          )}
-        </div>
+          <span 
+            aria-hidden="true"
+            style={{
+              width: '0',
+              height: '0',
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderTop: '5px solid #64748b',
+              marginLeft: '2px',
+              marginTop: '2px'
+            }}
+          />
+        </button>
 
         {/* PROFILE/ROLE SWITCHING DROPDOWN FOR MD/ADMIN USERS */}
         {showProfileMenu && (
@@ -202,8 +220,11 @@ export default function Header({
                   {[
                     { id: 'admin', name: 'Administrator' },
                     { id: 'doctor', name: 'Doctor' },
-                    { id: 'nurse_pharmacy', name: 'Nurse & Pharmacy' },
-                    { id: 'technician', name: 'Laboratory Technician' }
+                    { id: 'technician', name: 'Laboratory Technician' },
+                    { id: 'senior_technician', name: 'Senior Technician' },
+                    { id: 'pathologist', name: 'Pathologist' },
+                    { id: 'receptionist', name: 'Receptionist' },
+                    { id: 'nurse_pharmacy', name: 'Nurse (Collection)' }
                   ].map(r => (
                     <button 
                       key={r.id}
@@ -266,37 +287,19 @@ export default function Header({
         )}
       </div>
 
-      {/* CENTER: Navigation pills inside header */}
-      <div className="erp-header-nav" style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-        {visibleNavItems.map(item => {
-          const isActive = activePanel === item.id;
-          return (
-            <button 
-              key={item.id}
-              className={`erp-nav-pill ${isActive ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel(item.id);
-              }}
-              style={{
-                border: isActive ? '1.5px solid #1e293b' : '1px solid rgba(0, 0, 0, 0.08)',
-                padding: '6px 14px',
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                borderRadius: '18px',
-                backgroundColor: '#ffffff'
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', color: item.iconColor }}>
-                {React.cloneElement(item.icon, { style: { width: '13px', height: '13px', strokeWidth: 2.2, fill: 'none', stroke: 'currentColor' } })}
-              </span>
-              <span style={{ color: '#1e293b' }}>{item.label}</span>
-            </button>
-          );
-        })}
+      {/* CENTER: System Title */}
+      <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+        <span aria-hidden="true" style={{
+          width: '34px', height: '34px', borderRadius: '10px',
+          background: 'var(--primary-gradient)', color: '#ffffff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: '800', fontSize: '13px', fontFamily: 'var(--font-title)',
+          letterSpacing: '0.5px', boxShadow: '0 6px 14px -4px rgba(79,70,229,0.6)'
+        }}>RK</span>
+        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', letterSpacing: '0.4px', margin: 0, fontFamily: 'var(--font-title)', textTransform: 'uppercase' }}>RK Clinic Laboratory</h1>
+          <span style={{ fontSize: '9.5px', fontWeight: '600', color: '#64748b', marginTop: '2px', letterSpacing: '0.2px' }}>Laboratory Workflow &amp; Reporting System</span>
+        </div>
       </div>
 
       {/* RIGHT: Search, Notifications, Settings */}
@@ -317,14 +320,14 @@ export default function Header({
             height: '34px'
           }}
         >
-          <svg viewBox="0 0 24 24" style={{ width: '12px', height: '12px', stroke: '#64748b', fill: 'none', strokeWidth: 2.5 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" style={{ width: '12px', height: '12px', stroke: '#64748b', fill: 'none', strokeWidth: 2.5 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input 
-            type="text" 
+            type="search" 
             className="search-input-erp" 
             placeholder="Search.." 
+            aria-label="Search patients and records"
             style={{ 
               border: 'none', 
-              outline: 'none', 
               fontSize: '11px', 
               width: '100%', 
               background: 'transparent',
@@ -339,6 +342,9 @@ export default function Header({
           <button 
             className="erp-action-btn" 
             onClick={() => setShowNotifications(!showNotifications)}
+            aria-label="Notifications and alerts"
+            aria-haspopup="true"
+            aria-expanded={showNotifications}
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid rgba(0, 0, 0, 0.08)',
@@ -352,8 +358,8 @@ export default function Header({
               padding: 0
             }}
           >
-            <svg viewBox="0 0 24 24" style={{ width: '14px', height: '14px', stroke: '#1e293b', fill: 'none', strokeWidth: 2 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span style={{ position: 'absolute', top: '7px', right: '7px', width: '5px', height: '5px', backgroundColor: '#e11d48', borderRadius: '50%' }} />
+            <svg aria-hidden="true" viewBox="0 0 24 24" style={{ width: '14px', height: '14px', stroke: '#1e293b', fill: 'none', strokeWidth: 2 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span aria-hidden="true" style={{ position: 'absolute', top: '7px', right: '7px', width: '5px', height: '5px', backgroundColor: '#e11d48', borderRadius: '50%' }} />
           </button>
 
           {showNotifications && (
@@ -378,6 +384,7 @@ export default function Header({
         <button 
           className="erp-action-btn" 
           onClick={() => setActivePanel('settings')}
+          aria-label="Open settings"
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid rgba(0, 0, 0, 0.08)',
@@ -391,7 +398,7 @@ export default function Header({
             padding: 0
           }}
         >
-          <svg viewBox="0 0 24 24" style={{ width: '14px', height: '14px', stroke: '#1e293b', fill: 'none', strokeWidth: 2 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" style={{ width: '14px', height: '14px', stroke: '#1e293b', fill: 'none', strokeWidth: 2 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
     </header>

@@ -76,8 +76,19 @@ export default function LaboratoryPanel() {
     updateLabOrderStatus,
     escalateLabOrder,
     getAnalyzerWorklist,
-    labAlerts
+    labAlerts,
+    partners,
+    editAudits,
+    labTestsMaster,
+    createLabOrder,
+    updateLabResult,
+    submitForVerification,
+    addB2BPartner,
+    deleteB2BPartner,
+    invoices
   } = useClinic();
+
+  const criticalAlerts = labAlerts ? labAlerts.filter(a => a.severity === 'Critical' || a.severity === 'High') : [];
 
   // State variables for Incoming Queue & Sample Collection matching
   const [activeOrderForCollection, setActiveOrderForCollection] = useState(null);
@@ -112,10 +123,85 @@ export default function LaboratoryPanel() {
   const [collectionSampleType, setCollectionSampleType] = useState('Blood');
   const [collectionBy, setCollectionBy] = useState('Lab Tech Suresh');
   const [collectionTime, setCollectionTime] = useState('');
+
+  // Mock LIS Barcode Scanner Simulator State
+  const [simBarcode, setSimBarcode] = useState('');
+  const [simMachineId, setSimMachineId] = useState('weldon');
+  const [simStatusMessage, setSimStatusMessage] = useState('');
+  const [simStatusSeverity, setSimStatusSeverity] = useState('');
+
+  const handleSimulateScan = async () => {
+    setSimStatusMessage('');
+    setSimStatusSeverity('');
+
+    if (!simBarcode.trim()) {
+      setSimStatusMessage('⚠️ Please select or enter a barcode.');
+      setSimStatusSeverity('warning');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/lab/analyzer/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode: simBarcode.trim(), machineId: simMachineId })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSimStatusMessage(`✅ Success: Specimen matches ${data.patientName} (${data.taskId}). Status: ${data.status} on ${data.machineName}.`);
+        setSimStatusSeverity('success');
+      } else {
+        setSimStatusMessage(`❌ Error: ${data.error || 'Unknown error.'}`);
+        setSimStatusSeverity('error');
+      }
+    } catch (err) {
+      console.error(err);
+      setSimStatusMessage(`❌ Scanner network connection error: ${err.message}`);
+      setSimStatusSeverity('error');
+    }
+  };
   
   // Manual result entry state
   const [manualEntryMode, setManualEntryMode] = useState(false);
   const [manualResultsObj, setManualResultsObj] = useState({}); // maps testName to result text
+
+  // Result Parameter Editor States
+  const [editingTestName, setEditingTestName] = useState('');
+  const [tempParameters, setTempParameters] = useState([]);
+  const [tempRemarks, setTempRemarks] = useState('');
+  const [tempInterpretation, setTempInterpretation] = useState('');
+  const [editReason, setEditReason] = useState('');
+
+  // Analyzer simulator state
+  const [selectedTaskForRun, setSelectedTaskForRun] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [selectedAnalyzerId, setSelectedAnalyzerId] = useState('');
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (selectedTaskForRun && editingTestName) {
+      const testRes = selectedTaskForRun.testResults[editingTestName];
+      if (testRes) {
+        setTempParameters(testRes.parameters || []);
+        setTempRemarks(testRes.remarks || 'Normal');
+        setTempInterpretation(testRes.interpretation || 'Physiological levels within range.');
+        setEditReason('');
+      } else {
+        // Find default parameters from master
+        const master = labTestsMaster.find(t => t.testName === editingTestName);
+        if (master) {
+          setTempParameters(master.parameters || []);
+          setTempRemarks('Normal');
+          setTempInterpretation('Physiological levels within range.');
+          setEditReason('');
+        }
+      }
+    }
+  }, [selectedTaskForRun, editingTestName, labTestsMaster]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Connected LIS Analyzers state
   const [analyzers, setAnalyzers] = useState([
@@ -134,14 +220,13 @@ export default function LaboratoryPanel() {
   const [assistantSelectedTests, setAssistantSelectedTests] = useState([]);
   const [validationAlert, setValidationAlert] = useState(null); // { text, severity }
 
+  // Simulated WhatsApp Delivery States
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [whatsAppRecipient, setWhatsAppRecipient] = useState('');
+  const [whatsAppMessage, setWhatsAppMessage] = useState('');
+
   // Search & Filter state for Dashboard
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Analyzer simulator state
-  const [selectedTaskForRun, setSelectedTaskForRun] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [selectedAnalyzerId, setSelectedAnalyzerId] = useState('');
 
   const downloadReportPDF = () => {
     const input = document.getElementById('lab-report-sheet');
@@ -183,6 +268,7 @@ export default function LaboratoryPanel() {
   ]);
 
   // Sync analyzers state with context analyzerConnections
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (analyzerConnections) {
       setAnalyzers(prev => prev.map(a => {
@@ -200,6 +286,7 @@ export default function LaboratoryPanel() {
       }));
     }
   }, [analyzerConnections]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Sync waiting queue count for analyzers
   useEffect(() => {
@@ -220,6 +307,19 @@ export default function LaboratoryPanel() {
       }));
     }, 0);
     return () => clearTimeout(timer);
+  }, [labTasks]);
+
+  const prevStatusesRef = React.useRef({});
+  useEffect(() => {
+    labTasks.forEach(task => {
+      const prevStatus = prevStatusesRef.current[task.taskId];
+      if (prevStatus !== task.status) {
+        if (prevStatus && task.status === 'Analyzer Running') {
+          addLisLog(`Real-time Scan: Specimen barcode ${task.specimenId} matched to ${task.patientName}. Run started on ${task.machineAssigned || 'LIS Analyzer'}.`, 'info');
+        }
+        prevStatusesRef.current[task.taskId] = task.status;
+      }
+    });
   }, [labTasks]);
 
   // Log logger
@@ -634,18 +734,13 @@ export default function LaboratoryPanel() {
             // Call backend context to save results and update EMR/Alerts
             saveLabResult(selectedTaskForRun.taskId, generatedOutputs, machine.name);
             
-            // Advance task status to QC Verification
-            if (markQCVerification) {
-              markQCVerification(selectedTaskForRun.taskId);
-            }
-
-            addLisLog(`LIS Task ${selectedTaskForRun.taskId}: Machine Completed. Pushed to QC verification.`, 'success');
+            addLisLog(`LIS Task ${selectedTaskForRun.taskId}: Machine Completed. Draft report ready for technician review.`, 'success');
 
             // Reset machine workstate
             setAnalyzers(prev => prev.map(a => a.id === selectedAnalyzerId ? { ...a, workState: 'Ready', currentSample: '-', completedCount: a.completedCount + 1 } : a));
             setIsAnalyzing(false);
             setSelectedTaskForRun(null);
-            alert(`Analyzer spin complete for sample ${selectedTaskForRun.specimenId}.`);
+            alert(`Analyzer spin complete for sample ${selectedTaskForRun.specimenId}. Draft results loaded.`);
           }, 300);
           return 100;
         }
@@ -661,19 +756,530 @@ export default function LaboratoryPanel() {
     verifyLabOrder(activeTaskForQC.taskId, qcRemarks || 'All parameters within physiological limits.', 'Dr. S. Vardhan, MD');
 
     addLisLog(`Verified consolidates for ${activeTaskForQC.patientName} (Task: ${activeTaskForQC.taskId}).`, 'success');
-    alert(`Consolidated Diagnostic Report Verified for Task ${activeTaskForQC.taskId}. Released to EMR.`);
     
-    // Set for printing
+    // Find payment status to set next status locally
+    const order = labOrders.find(o => o.labOrderNumber === activeTaskForQC.taskId);
+    const balance = order ? (order.balance !== undefined ? order.balance : 0) : 0;
+    const isPaid = order ? (order.paymentStatus === 'Fully Paid' || balance <= 0) : true;
+    const nextStatus = isPaid ? 'Ready for Delivery' : 'Payment Verification';
+
     const updatedTask = {
       ...activeTaskForQC,
-      status: 'Verified',
+      status: nextStatus,
       verifiedBy: 'Dr. S. Vardhan, MD',
       verifiedAt: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       remarks: qcRemarks || 'All parameters within physiological limits.'
     };
+    
+    alert(`Report Verified. Next step: ${nextStatus === 'Ready for Delivery' ? 'Ready for Delivery' : 'Blocked (Payment Verification)'}`);
+    
+    setActiveTaskForQC(updatedTask);
     setPrintedTaskData(updatedTask);
-    setActiveTaskForQC(null);
     setQcRemarks('');
+  };
+
+  const LabOrderEntryTab = () => {
+    const [selectedPatientId, setSelectedPatientId] = useState('');
+    const [customerType, setCustomerType] = useState('Walk-in');
+    const [selectedPartnerId, setSelectedPartnerId] = useState('');
+    const [selectedTests, setSelectedTests] = useState([]);
+    const [orderPriority, setOrderPriority] = useState('Routine');
+    const [orderNotes, setOrderNotes] = useState('');
+    const [reqDoctor, setReqDoctor] = useState('Dr. R. Kumar');
+
+    const partner = partners.find(p => p.id === selectedPartnerId);
+    let subtotal = 0;
+    
+    selectedTests.forEach(testName => {
+      const master = labTestsMaster.find(t => t.testName === testName);
+      if (master) {
+        subtotal += customerType === 'Walk-in' ? master.b2cPrice : master.b2bPrice;
+      }
+    });
+
+    let discountPct = 0;
+    if (customerType !== 'Walk-in' && partner) {
+      discountPct = partner.discount;
+    }
+
+    const discountVal = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
+    const grandTotal = parseFloat((subtotal - discountVal).toFixed(2));
+
+    const handleToggleTest = (testName) => {
+      setSelectedTests(prev => 
+        prev.includes(testName) ? prev.filter(t => t !== testName) : [...prev, testName]
+      );
+    };
+
+    const handleCreateOrder = () => {
+      if (!selectedPatientId) {
+        alert('Please select a patient.');
+        return;
+      }
+      if (selectedTests.length === 0) {
+        alert('Please select at least one test.');
+        return;
+      }
+      if (customerType === 'B2B Partner' && !selectedPartnerId) {
+        alert('Please select a B2B Partner.');
+        return;
+      }
+
+      const order = createLabOrder(
+        selectedPatientId,
+        selectedTests,
+        reqDoctor,
+        orderNotes,
+        orderPriority,
+        customerType,
+        selectedPartnerId
+      );
+
+      if (order) {
+        alert(`Lab Order ${order.labOrderNumber} & Invoice ${order.invoiceId} successfully created!`);
+        setSelectedPatientId('');
+        setCustomerType('Walk-in');
+        setSelectedPartnerId('');
+        setSelectedTests([]);
+        setOrderNotes('');
+        setLabActiveTab('registration');
+      } else {
+        alert('Failed to create order.');
+      }
+    };
+
+    return (
+      <div className="dashboard-grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+        <div className="panel-card" style={{ padding: '24px', borderRadius: '16px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '16px' }}>
+            📝 Workstation Order Form
+          </h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label className="input-label-style">Select Patient *</label>
+              <select 
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value)}
+                className="select-input-style"
+              >
+                <option value="">-- Choose Patient --</option>
+                {patients.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.id}) - {p.gender}, {p.age}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="input-label-style">Customer Category</label>
+              <select 
+                value={customerType}
+                onChange={(e) => {
+                  setCustomerType(e.target.value);
+                  setSelectedPartnerId('');
+                }}
+                className="select-input-style"
+              >
+                <option value="Walk-in">Direct Walk-in (B2C)</option>
+                <option value="B2B Partner">B2B Partner Laboratory</option>
+              </select>
+            </div>
+          </div>
+
+          {customerType === 'B2B Partner' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label className="input-label-style">Select B2B Partner *</label>
+              <select 
+                value={selectedPartnerId}
+                onChange={(e) => setSelectedPartnerId(e.target.value)}
+                className="select-input-style"
+              >
+                <option value="">-- Select Lab Partner --</option>
+                {partners.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} (Discount: {p.discount}%)</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label className="input-label-style">Ordering Doctor</label>
+              <input 
+                type="text" 
+                value={reqDoctor}
+                onChange={(e) => setReqDoctor(e.target.value)}
+                className="select-input-style"
+                placeholder="Dr. Name"
+              />
+            </div>
+            <div>
+              <label className="input-label-style">Order Priority</label>
+              <select 
+                value={orderPriority}
+                onChange={(e) => setOrderPriority(e.target.value)}
+                className="select-input-style"
+              >
+                <option value="Routine">Routine</option>
+                <option value="Urgent">Urgent</option>
+                <option value="Emergency">Emergency</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label className="input-label-style">Clinical Notes / Referral Reasons</label>
+            <textarea 
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              className="select-input-style"
+              style={{ minHeight: '60px' }}
+              placeholder="E.g., Referral details..."
+            />
+          </div>
+
+          <div style={{ marginBottom: '10px', fontWeight: '800', fontSize: '13px' }}>
+            Select Lab Tests *
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', backgroundColor: 'var(--bg-primary)' }}>
+            {labTestsMaster.map(t => {
+              const testPrice = customerType === 'Walk-in' ? t.b2cPrice : t.b2bPrice;
+              const isChecked = selectedTests.includes(t.testName);
+              return (
+                <label 
+                  key={t.testName} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px', 
+                    fontSize: '12px', 
+                    padding: '6px', 
+                    borderRadius: '4px',
+                    backgroundColor: isChecked ? 'rgba(79, 70, 229, 0.05)' : 'transparent',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={isChecked}
+                    onChange={() => handleToggleTest(t.testName)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>{t.testName} <strong style={{ color: 'var(--primary)', marginLeft: 'auto' }}>{currency}{testPrice}</strong></span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="panel-card" style={{ padding: '24px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: 'rgba(79, 70, 229, 0.02)', border: '1.5px solid var(--primary-light)' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '16px' }}>
+              📊 Invoice Estimation & Summary
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+              {selectedTests.map(tName => {
+                const master = labTestsMaster.find(t => t.testName === tName);
+                const price = master ? (customerType === 'Walk-in' ? master.b2cPrice : master.b2bPrice) : 0;
+                return (
+                  <div key={tName} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                    <span>{tName}</span>
+                    <span>{currency}{price.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+              
+              {selectedTests.length === 0 && (
+                <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
+                  No tests selected yet.
+                </div>
+              )}
+
+              <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', margin: '10px 0' }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                <span>Subtotal</span>
+                <span>{currency}{subtotal.toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--rose)' }}>
+                <span>Discount Applied ({discountPct}%)</span>
+                <span>-{currency}{discountVal.toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', color: 'var(--primary)', marginTop: '8px' }}>
+                <span>Grand Total</span>
+                <span>{currency}{grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={handleCreateOrder}
+            className="btn btn-primary"
+            style={{ width: '100%', marginTop: '20px', padding: '12px 0', fontSize: '13px', fontWeight: 'bold' }}
+          >
+            🚀 Generate Order & Invoice
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const B2BPartnersTab = () => {
+    const [partnerName, setPartnerName] = useState('');
+    const [contactPerson, setContactPerson] = useState('');
+    const [mobile, setMobile] = useState('');
+    const [address, setAddress] = useState('');
+    const [gst, setGst] = useState('');
+    const [discount, setDiscount] = useState('10');
+
+    const handleAddPartner = (e) => {
+      e.preventDefault();
+      if (!partnerName || !mobile) {
+        alert('Please fill in Partner Name and Mobile Number.');
+        return;
+      }
+      addB2BPartner({
+        name: partnerName,
+        contactPerson,
+        mobile,
+        address,
+        gst,
+        discount: parseFloat(discount)
+      });
+      alert('B2B partner successfully registered!');
+      setPartnerName('');
+      setContactPerson('');
+      setMobile('');
+      setAddress('');
+      setGst('');
+      setDiscount('10');
+    };
+
+    return (
+      <div className="dashboard-grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+        <div className="panel-card" style={{ padding: '24px', borderRadius: '16px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '16px' }}>
+            🏢 B2B Partners Registry
+          </h3>
+
+          <div style={{ overflowX: 'auto' }}>
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '10px' }}>Partner ID</th>
+                    <th style={{ padding: '10px' }}>Lab Name</th>
+                    <th style={{ padding: '10px' }}>Contact Person</th>
+                    <th style={{ padding: '10px' }}>Mobile</th>
+                    <th style={{ padding: '10px' }}>Discount %</th>
+                    <th style={{ padding: '10px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {partners.map(p => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '10px', fontWeight: 'bold' }}>{p.id}</td>
+                      <td style={{ padding: '10px' }}>{p.name}</td>
+                      <td style={{ padding: '10px' }}>{p.contactPerson}</td>
+                      <td style={{ padding: '10px' }}>{p.mobile}</td>
+                      <td style={{ padding: '10px', color: 'var(--rose)', fontWeight: 'bold' }}>{p.discount}%</td>
+                      <td style={{ padding: '10px' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete ${p.name}?`)) {
+                              deleteB2BPartner(p.id);
+                            }
+                          }}
+                          className="btn btn-rose btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '10px' }}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {partners.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No B2B partners registered yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel-card" style={{ padding: '24px', borderRadius: '16px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '16px' }}>
+            ➕ Register B2B Partner
+          </h3>
+          
+          <form onSubmit={handleAddPartner} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label className="input-label-style">Partner Laboratory Name *</label>
+              <input 
+                type="text" 
+                value={partnerName}
+                onChange={(e) => setPartnerName(e.target.value)}
+                className="select-input-style"
+                placeholder="e.g. Apex Diagnostics Ltd."
+                required
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label className="input-label-style">Contact Person</label>
+                <input 
+                  type="text" 
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                  className="select-input-style"
+                  placeholder="e.g. Dr. John"
+                />
+              </div>
+              <div>
+                <label className="input-label-style">Mobile *</label>
+                <input 
+                  type="tel" 
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  className="select-input-style"
+                  placeholder="e.g. 9876543210"
+                  required
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label className="input-label-style">Discount Percentage (%)</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  max="100"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  className="select-input-style"
+                  placeholder="e.g. 15"
+                />
+              </div>
+              <div>
+                <label className="input-label-style">GSTIN</label>
+                <input 
+                  type="text" 
+                  value={gst}
+                  onChange={(e) => setGst(e.target.value)}
+                  className="select-input-style"
+                  placeholder="e.g. 36AAAAA1111A1Z1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="input-label-style">Address</label>
+              <textarea 
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="select-input-style"
+                style={{ minHeight: '60px' }}
+                placeholder="e.g. Lane No 4, Jubilee Hills"
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: '10px', padding: '10px 0', fontSize: '12px', fontWeight: 'bold' }}
+            >
+              Save Partner
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const AuditLogsTab = () => {
+    return (
+      <div className="panel-card" style={{ padding: '24px', borderRadius: '16px', animation: 'fadeIn 0.2s ease-out' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '20px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '850', margin: 0 }}>📋 LIS Parameter-Level Audit Trails</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '4px 0 0 0' }}>
+              Historical log of all manual overrides and parameter calibration overrides.
+            </p>
+          </div>
+          <span className="badge badge-indigo" style={{ padding: '6px 12px', fontSize: '11px' }}>
+            🔒 Compliance Compliant
+          </span>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--bg-primary)', borderBottom: '1.5px solid var(--border-color)', fontWeight: 'bold', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '10px' }}>Timestamp</th>
+                  <th style={{ padding: '10px' }}>Order ID</th>
+                  <th style={{ padding: '10px' }}>Analyte / Test</th>
+                  <th style={{ padding: '10px' }}>Parameter</th>
+                  <th style={{ padding: '10px' }}>Old Value</th>
+                  <th style={{ padding: '10px' }}>New Value</th>
+                  <th style={{ padding: '10px' }}>Reason for Change</th>
+                  <th style={{ padding: '10px' }}>Adjusted By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {editAudits.map((log) => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '10px', color: 'var(--text-muted)' }}>
+                      {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <code>{log.lab_order_number}</code>
+                    </td>
+                    <td style={{ padding: '10px', fontWeight: '600' }}>
+                      {log.test_name}
+                    </td>
+                    <td style={{ padding: '10px', color: 'var(--primary)', fontWeight: '600' }}>
+                      {log.parameter_name}
+                    </td>
+                    <td style={{ padding: '10px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                      {log.old_value}
+                    </td>
+                    <td style={{ padding: '10px', fontWeight: 'bold', color: 'var(--emerald)' }}>
+                      {log.new_value}
+                    </td>
+                    <td style={{ padding: '10px', fontStyle: 'italic' }}>
+                      {log.change_reason}
+                    </td>
+                    <td style={{ padding: '10px', fontWeight: '600' }}>
+                      👤 {log.changed_by}
+                    </td>
+                  </tr>
+                ))}
+                {editAudits.length === 0 && (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      No parameter manual overrides logged in database audits.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Main UI Tab Content router
@@ -790,7 +1396,7 @@ export default function LaboratoryPanel() {
                             className="btn btn-secondary btn-sm"
                             onClick={() => {
                               setBarcodePrintedForOrder(prev => ({ ...prev, [order.labOrderNumber]: true }));
-                              alert(`Mock Print: Labels printed for ${patientBarcode} & ${specimenBarcode}`);
+                              alert(`Print: Labels printed for ${patientBarcode} & ${specimenBarcode}`);
                               addLisLog(`Printed barcodes for ${order.labOrderNumber}`, 'success');
                             }}
                           >
@@ -913,9 +1519,8 @@ export default function LaboratoryPanel() {
           'Assigned', 
           'Processing', 
           'Analyzer Running', 
-          'QC Verification', 
-          'Pending Verification', 
-          'Completed'
+          'Draft',
+          'Pending Verification'
         ].includes(t.status));
         
         return (
@@ -987,138 +1592,306 @@ export default function LaboratoryPanel() {
 
                     {selectedTaskForRun.status !== 'Sample Collected' ? (
                       <>
-                        <div style={{ display: 'flex', gap: '10px', margin: '4px 0' }}>
-                          <button 
-                            type="button" 
-                            className={`btn ${!manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setManualEntryMode(false)}
-                            style={{ flex: 1, fontSize: '12px' }}
-                          >
-                            🔬 LIS Analyzer Import
-                          </button>
-                          <button 
-                            type="button" 
-                            className={`btn ${manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setManualEntryMode(true)}
-                            style={{ flex: 1, fontSize: '12px' }}
-                          >
-                            ✍️ Manual Result Entry
-                          </button>
-                        </div>
-
-                        {!manualEntryMode ? (
-                          /* LIS Analyzer Mode */
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <label className="input-label-style">Select Connected Analyzer Port</label>
-                              <select 
-                                value={selectedAnalyzerId}
-                                onChange={(e) => {
-                                  setSelectedAnalyzerId(e.target.value);
-                                }}
-                                className="select-input-style"
-                              >
-                                <option value="">-- Choose Target Analyzer Machine --</option>
-                                {analyzers.map(mac => {
-                                  const isCompatible = selectedTaskForRun.orderedTests.some(t => {
-                                    const dest = getMachineForTest(t);
-                                    return dest && dest.id === mac.id;
-                                  });
-                                  return (
-                                    <option key={mac.id} value={mac.id}>
-                                      {mac.name} - {mac.dept} {isCompatible ? '★ (Recommended)' : ''}
-                                    </option>
-                                  );
-                                })}
-                              </select>
+                        {['Draft', 'Pending Verification'].includes(selectedTaskForRun.status) ? (
+                          /* Draft / Parameter Editing Mode */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px', backgroundColor: 'var(--bg-surface)' }}>
+                            <div style={{ fontWeight: '850', fontSize: '13px', color: 'var(--primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
+                              ✏️ LIS Parameter Value Adjustment
                             </div>
 
-                            {selectedAnalyzerId && (
-                              <div style={{ display: 'flex', gap: '10px' }}>
-                                <button 
-                                  type="button" 
-                                  className="btn btn-indigo"
-                                  style={{ flex: 1, height: '40px', fontWeight: '750' }}
-                                  onClick={() => {
-                                    assignLabMachine(selectedTaskForRun.taskId, analyzers.find(a => a.id === selectedAnalyzerId)?.name);
-                                    addLisLog(`Assigned ${selectedTaskForRun.taskId} to analyzer ${selectedAnalyzerId}`, 'info');
-                                    handleLaunchAnalyzer();
-                                  }}
-                                  disabled={isAnalyzing}
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {selectedTaskForRun.orderedTests.map(testName => (
+                                <button
+                                  key={testName}
+                                  type="button"
+                                  className={`btn btn-sm ${editingTestName === testName ? 'btn-primary' : 'btn-secondary'}`}
+                                  onClick={() => setEditingTestName(testName)}
+                                  style={{ padding: '6px 12px', fontSize: '11px' }}
                                 >
-                                  🚀 Assign & Run Analyzer Cycle
+                                  {testName}
                                 </button>
+                              ))}
+                            </div>
+
+                            {editingTestName ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div className="table-responsive">
+                                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                                      <thead>
+                                        <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                                          <th style={{ padding: '6px' }}>Parameter</th>
+                                          <th style={{ padding: '6px' }}>Observed Value</th>
+                                          <th style={{ padding: '6px' }}>Unit</th>
+                                          <th style={{ padding: '6px' }}>Ref Range</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {tempParameters.map((param, pIdx) => (
+                                          <tr key={param.name} style={{ borderBottom: '1px solid rgba(0,0,0,0.02)' }}>
+                                            <td style={{ padding: '6px', fontWeight: 'bold' }}>{param.name}</td>
+                                            <td style={{ padding: '6px' }}>
+                                              <input
+                                                type="text"
+                                                value={param.val || ''}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setTempParameters(prev => prev.map((p, idx) => idx === pIdx ? { ...p, val } : p));
+                                                }}
+                                                style={{
+                                                  border: '1px solid var(--border-color)',
+                                                  borderRadius: '4px',
+                                                  height: '28px',
+                                                  padding: '2px 8px',
+                                                  fontSize: '12px',
+                                                  width: '100px',
+                                                  backgroundColor: 'var(--bg-primary)',
+                                                  color: 'var(--text-primary)'
+                                                }}
+                                              />
+                                            </td>
+                                            <td style={{ padding: '6px', color: 'var(--text-muted)' }}>{param.unit}</td>
+                                            <td style={{ padding: '6px', color: 'var(--text-muted)' }}>{param.refRange}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="input-label-style">Remarks / QC Observations</label>
+                                  <input
+                                    type="text"
+                                    value={tempRemarks}
+                                    onChange={(e) => setTempRemarks(e.target.value)}
+                                    className="select-input-style"
+                                    style={{ height: '32px' }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="input-label-style">Clinical Interpretation</label>
+                                  <textarea
+                                    value={tempInterpretation}
+                                    onChange={(e) => setTempInterpretation(e.target.value)}
+                                    className="select-input-style"
+                                    style={{ minHeight: '50px' }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="input-label-style">Reason for Manual Adjustment <span style={{ color: 'red' }}>*</span></label>
+                                  <input
+                                    type="text"
+                                    value={editReason}
+                                    onChange={(e) => setEditReason(e.target.value)}
+                                    className="select-input-style"
+                                    style={{ height: '32px' }}
+                                    placeholder="e.g., Analyzer calibration correction"
+                                  />
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-indigo"
+                                    style={{ flex: 1, height: '36px', fontSize: '12px', fontWeight: 'bold' }}
+                                    onClick={() => {
+                                      if (!editReason.trim()) {
+                                        alert('Please specify the reason for this manual adjustment.');
+                                        return;
+                                      }
+                                      updateLabResult(
+                                        selectedTaskForRun.taskId,
+                                        editingTestName,
+                                        tempParameters,
+                                        tempRemarks,
+                                        tempInterpretation,
+                                        'Lab Technician',
+                                        editReason
+                                      );
+                                      alert('Parameters successfully adjusted and logged in audit trials!');
+                                      addLisLog(`Adjusted parameters for ${editingTestName} (${selectedTaskForRun.taskId})`, 'info');
+                                      setSelectedTaskForRun(prev => {
+                                        const updatedResults = {
+                                          ...prev.testResults,
+                                          [editingTestName]: {
+                                            ...prev.testResults[editingTestName],
+                                            parameters: tempParameters,
+                                            remarks: tempRemarks,
+                                            interpretation: tempInterpretation
+                                          }
+                                        };
+                                        return { ...prev, testResults: updatedResults };
+                                      });
+                                    }}
+                                  >
+                                    💾 Save Parameter Adjustments
+                                  </button>
+
+                                  {selectedTaskForRun.status === 'Draft' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary"
+                                      style={{ flex: 1, height: '36px', fontSize: '12px', fontWeight: 'bold' }}
+                                      onClick={() => {
+                                        submitForVerification(selectedTaskForRun.taskId);
+                                        alert('Results submitted to Pathologist for final QC approval!');
+                                        addLisLog(`Submitted ${selectedTaskForRun.taskId} to Pathologist`, 'success');
+                                        setSelectedTaskForRun(null);
+                                        setEditingTestName('');
+                                      }}
+                                    >
+                                      🛡️ Submit for QC Approval
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Choose a test button above to edit its parameters.
                               </div>
                             )}
                           </div>
                         ) : (
-                          /* Manual Entry Mode */
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <strong style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-                              Manual Observations:
-                            </strong>
-                            {selectedTaskForRun.orderedTests.map(testName => (
-                              <div key={testName} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <label style={{ fontSize: '11.5px', fontWeight: '700' }}>{testName} Results</label>
-                                  <button 
-                                    type="button" 
-                                    className="btn btn-secondary btn-sm"
-                                    style={{ padding: '2px 6px', fontSize: '9.5px' }}
-                                    onClick={() => {
-                                      const defaults = generateSimulatedResults([testName]);
-                                      setManualResultsObj(prev => ({
-                                        ...prev,
-                                        [testName]: defaults[testName]?.val || ''
-                                      }));
+                          <>
+                            <div style={{ display: 'flex', gap: '10px', margin: '4px 0' }}>
+                              <button 
+                                type="button" 
+                                className={`btn ${!manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setManualEntryMode(false)}
+                                style={{ flex: 1, fontSize: '12px' }}
+                              >
+                                🔬 LIS Analyzer Import
+                              </button>
+                              <button 
+                                type="button" 
+                                className={`btn ${manualEntryMode ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setManualEntryMode(true)}
+                                style={{ flex: 1, fontSize: '12px' }}
+                              >
+                                ✍️ Manual Result Entry
+                              </button>
+                            </div>
+
+                            {!manualEntryMode ? (
+                              /* LIS Analyzer Mode */
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <label className="input-label-style">Select Connected Analyzer Port</label>
+                                  <select 
+                                    value={selectedAnalyzerId}
+                                    onChange={(e) => {
+                                      setSelectedAnalyzerId(e.target.value);
                                     }}
+                                    className="select-input-style"
                                   >
-                                    Load Template
-                                  </button>
+                                    <option value="">-- Choose Target Analyzer Machine --</option>
+                                    {analyzers.map(mac => {
+                                      const isCompatible = selectedTaskForRun.orderedTests.some(t => {
+                                        const dest = getMachineForTest(t);
+                                        return dest && dest.id === mac.id;
+                                      });
+                                      return (
+                                        <option key={mac.id} value={mac.id}>
+                                          {mac.name} - {mac.dept} {isCompatible ? '★ (Recommended)' : ''}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
                                 </div>
-                                <textarea 
-                                  rows="2"
-                                  value={manualResultsObj[testName] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setManualResultsObj(prev => ({ ...prev, [testName]: val }));
-                                  }}
-                                  className="clinical-textarea"
-                                  placeholder={`Enter observations for ${testName}...`}
-                                  style={{ minHeight: '60px', fontSize: '12px' }}
-                                />
+
+                                {selectedAnalyzerId && (
+                                  <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button 
+                                      type="button" 
+                                      className="btn btn-indigo"
+                                      style={{ flex: 1, height: '40px', fontWeight: '750' }}
+                                      onClick={() => {
+                                        assignLabMachine(selectedTaskForRun.taskId, analyzers.find(a => a.id === selectedAnalyzerId)?.name);
+                                        addLisLog(`Assigned ${selectedTaskForRun.taskId} to analyzer ${selectedAnalyzerId}`, 'info');
+                                        handleLaunchAnalyzer();
+                                      }}
+                                      disabled={isAnalyzing}
+                                    >
+                                      🚀 Assign & Run Analyzer Cycle
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                            ))}
+                            ) : (
+                              /* Manual Entry Mode */
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <strong style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                  Manual Observations:
+                                </strong>
+                                {selectedTaskForRun.orderedTests.map(testName => (
+                                  <div key={testName} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <label style={{ fontSize: '11.5px', fontWeight: '700' }}>{testName} Results</label>
+                                      <button 
+                                        type="button" 
+                                        className="btn btn-secondary btn-sm"
+                                        style={{ padding: '2px 6px', fontSize: '9.5px' }}
+                                        onClick={() => {
+                                          const defaults = generateSimulatedResults([testName]);
+                                          setManualResultsObj(prev => ({
+                                            ...prev,
+                                            [testName]: defaults[testName]?.val || ''
+                                          }));
+                                        }}
+                                      >
+                                        Load Template
+                                      </button>
+                                    </div>
+                                    <textarea 
+                                      rows="2"
+                                      value={manualResultsObj[testName] || ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setManualResultsObj(prev => ({ ...prev, [testName]: val }));
+                                      }}
+                                      className="clinical-textarea"
+                                      placeholder={`Enter observations for ${testName}...`}
+                                      style={{ minHeight: '60px', fontSize: '12px' }}
+                                    />
+                                  </div>
+                                ))}
 
-                            <button 
-                              type="button" 
-                              className="btn btn-indigo"
-                              style={{ height: '40px', fontWeight: '800', marginTop: '6px' }}
-                              onClick={() => {
-                                const resultsPayload = {};
-                                const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                selectedTaskForRun.orderedTests.forEach(test => {
-                                  resultsPayload[test] = {
-                                    val: manualResultsObj[test] || 'Standard observation values verified normal.',
-                                    machine: 'Manual Entry',
-                                    completedAt: timestamp
-                                  };
-                                });
+                                <button 
+                                  type="button" 
+                                  className="btn btn-indigo"
+                                  style={{ height: '40px', fontWeight: '800', marginTop: '6px' }}
+                                  onClick={() => {
+                                    const resultsPayload = {};
+                                    const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    selectedTaskForRun.orderedTests.forEach(test => {
+                                      resultsPayload[test] = {
+                                        val: manualResultsObj[test] || 'Standard observation values verified normal.',
+                                        machine: 'Manual Entry',
+                                        completedAt: timestamp
+                                      };
+                                    });
 
-                                saveLabResult(selectedTaskForRun.taskId, resultsPayload, 'Manual Entry');
-                                if (markQCVerification) {
-                                  markQCVerification(selectedTaskForRun.taskId);
-                                }
-                                alert(`Success: Results saved manually for specimen ${selectedTaskForRun.specimenId}. Pushed to Pathology Verification QC.`);
-                                addLisLog(`Manual result entry completed for task ${selectedTaskForRun.taskId}`, 'success');
-                                setSelectedTaskForRun(null);
-                                setManualEntryMode(false);
-                                setLabActiveTab('reports');
-                              }}
-                            >
-                              ✓ Save Results & Mark Completed
-                            </button>
-                          </div>
+                                    saveLabResult(selectedTaskForRun.taskId, resultsPayload, 'Manual Entry');
+                                    alert(`Success: Results saved as draft for specimen ${selectedTaskForRun.specimenId}.`);
+                                    addLisLog(`Manual result draft saved for task ${selectedTaskForRun.taskId}`, 'success');
+                                    
+                                    setSelectedTaskForRun(prev => ({
+                                      ...prev,
+                                      status: 'Draft',
+                                      testResults: resultsPayload
+                                    }));
+                                    setEditingTestName(selectedTaskForRun.orderedTests[0]);
+                                    setManualEntryMode(false);
+                                  }}
+                                >
+                                  ✓ Save Results as Draft
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </>
                     ) : (
@@ -1180,13 +1953,11 @@ export default function LaboratoryPanel() {
 
       case 'reports': // Pathologist QC Tab
         const verificationTasks = labTasks.filter(t => [
-          'QC Verification',
           'Pending Verification', 
-          'Machine Completed', 
-          'Completed', 
           'Verified',
-          'Report Generated',
-          'Report Delivered'
+          'Payment Verification',
+          'Ready for Delivery',
+          'Delivered'
         ].includes(t.status));
         
         return (
@@ -1194,122 +1965,194 @@ export default function LaboratoryPanel() {
             {/* Left side: Queue of reports */}
             <div className="panel-card" style={{ padding: '24px', borderRadius: '16px' }}>
               <h3 className="panel-card-title" style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-                🛡️ Pathologist verification & QC Queue ({verificationTasks.filter(t => !['Verified', 'Report Generated', 'Report Delivered'].includes(t.status)).length})
+                🛡️ Pathologist QC & Report Delivery Queue ({verificationTasks.filter(t => t.status === 'Pending Verification').length} Pending)
               </h3>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '420px' }}>
-                {verificationTasks.map(t => (
-                  <div key={t.taskId} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <strong style={{ fontSize: '13.5px' }}>{t.patientName}</strong>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Task ID: <code>{t.taskId}</code> | Specimen: <code>{t.specimenId}</code>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '520px' }}>
+                {verificationTasks.map(t => {
+                  const order = labOrders.find(o => o.labOrderNumber === t.taskId);
+                  const balance = order ? (order.balance !== undefined ? order.balance : 0) : 0;
+                  const customerType = order ? order.customerType : 'Walk-in';
+                  const paymentStatus = order ? order.paymentStatus : 'Unpaid';
+                  
+                  return (
+                    <div 
+                      key={t.taskId} 
+                      style={{ 
+                        padding: '14px', 
+                        border: '1.5px solid var(--border-color)', 
+                        borderRadius: '10px', 
+                        backgroundColor: activeTaskForQC?.taskId === t.taskId ? 'rgba(79, 70, 229, 0.04)' : 'var(--bg-primary)', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center' 
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <strong style={{ fontSize: '13.5px' }}>{t.patientName}</strong>
+                          <span className={`badge ${customerType === 'Walk-in' ? 'badge-sky' : 'badge-indigo'}`} style={{ fontSize: '8.5px' }}>
+                            {customerType === 'Walk-in' ? 'B2C' : 'B2B'}
+                          </span>
+                          <span className={`badge ${paymentStatus === 'Fully Paid' ? 'badge-emerald' : 'badge-rose'}`} style={{ fontSize: '8.5px' }}>
+                            {paymentStatus === 'Fully Paid' ? 'Paid' : `${currency}${balance} Due`}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          Task ID: <code>{t.taskId}</code> | Specimen: <code>{t.specimenId}</code>
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--primary)', marginTop: '4px' }}>
+                          Tests: {t.orderedTests.join(', ')}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--primary)', marginTop: '4px' }}>
-                        Tests: {t.orderedTests.join(', ')}
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <button 
-                        className={`btn ${['Verified', 'Report Generated', 'Report Delivered'].includes(t.status) ? 'btn-secondary' : 'btn-indigo'} btn-sm`}
-                        onClick={() => {
-                          setActiveTaskForQC(t);
-                          setQcRemarks(t.remarks);
-                          setPrintedTaskData(null);
-                        }}
-                        style={{ padding: '6px 12px', fontSize: '11.5px' }}
-                      >
-                        {['Verified', 'Report Generated', 'Report Delivered'].includes(t.status) ? '👁️ View Report' : '🛡️ Verify QC'}
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <button 
+                          className={`btn ${t.status === 'Pending Verification' ? 'btn-indigo' : 'btn-secondary'} btn-sm`}
+                          onClick={() => {
+                            setActiveTaskForQC(t);
+                            setQcRemarks(t.remarks || '');
+                            setPrintedTaskData(null);
+                          }}
+                          style={{ padding: '6px 12px', fontSize: '11.5px' }}
+                        >
+                          {t.status === 'Pending Verification' ? '🛡️ Verify QC' : '👁️ View'}
+                        </button>
+                        <span className="badge badge-secondary" style={{ fontSize: '9px', textAlign: 'center' }}>
+                          {t.status}
+                        </span>
+                      </div>
                     </div>
+                  );
+                })}
+                {verificationTasks.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>
+                    No reports in the Pathologist QC queue.
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
             {/* Right side: QC Panel Card */}
             <div className="panel-card" style={{ padding: '24px', borderRadius: '16px' }}>
-              {activeTaskForQC ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', animation: 'fadeIn 0.2s ease-out' }}>
-                  <h3 style={{ fontSize: '14.5px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', margin: 0 }}>
-                    🔬 Consolidated Laboratory Report Review
-                  </h3>
-                  
-                  <div style={{ fontSize: '12.5px' }}>
-                    <strong>Patient Name:</strong> {activeTaskForQC.patientName} ({activeTaskForQC.gender}) | <strong>Age:</strong> {activeTaskForQC.age}<br />
-                    <strong>Vial ID:</strong> <code>{activeTaskForQC.specimenId}</code> | <strong>Ref Doctor:</strong> {activeTaskForQC.doctorName}
-                  </div>
+              {activeTaskForQC ? (() => {
+                const order = labOrders.find(o => o.labOrderNumber === activeTaskForQC.taskId);
+                const balance = order ? (order.balance !== undefined ? order.balance : 0) : 0;
+                const currentStatus = labTasks.find(t => t.taskId === activeTaskForQC.taskId)?.status || activeTaskForQC.status;
+                const isBlocked = currentStatus === 'Payment Verification' || (currentStatus !== 'Pending Verification' && order?.paymentStatus !== 'Fully Paid' && balance > 0);
+                
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', animation: 'fadeIn 0.2s ease-out' }}>
+                    <h3 style={{ fontSize: '14.5px', fontWeight: '800', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', margin: 0 }}>
+                      🔬 Consolidated Laboratory Report Review
+                    </h3>
+                    
+                    <div style={{ fontSize: '12.5px' }}>
+                      <strong>Patient Name:</strong> {activeTaskForQC.patientName} ({activeTaskForQC.gender}) | <strong>Age:</strong> {activeTaskForQC.age}<br />
+                      <strong>Vial ID:</strong> <code>{activeTaskForQC.specimenId}</code> | <strong>Ref Doctor:</strong> {activeTaskForQC.doctorName}
+                    </div>
 
-                  {/* Consolidated Results List */}
-                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)', fontWeight: 'bold' }}>
-                          <th style={{ padding: '8px', textAlign: 'left' }}>Parameter</th>
-                          <th style={{ padding: '8px', textAlign: 'left' }}>Observed Result</th>
-                          <th style={{ padding: '8px', textAlign: 'left' }}>Source Analyzer</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeTaskForQC.orderedTests.map(testName => {
-                          const res = activeTaskForQC.testResults[testName];
-                          const hasAbnormal = res?.val && (res.val.includes('High') || res.val.includes('Low') || res.val.includes('Diabetic') || res.val.includes('Elevated') || res.val.includes('Hypothyroidism'));
-                          return (
-                            <tr key={testName} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                              <td style={{ padding: '8px' }}><strong>{testName}</strong></td>
-                              <td style={{ padding: '8px', color: hasAbnormal ? 'var(--rose)' : 'inherit', fontWeight: hasAbnormal ? '700' : 'normal', whiteSpace: 'pre-line' }}>
-                                {res ? res.val : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Pending result...</span>}
-                              </td>
-                              <td style={{ padding: '8px', fontSize: '10.5px' }}>{res ? res.machine : '-'}</td>
+                    {/* Consolidated Results List */}
+                    <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                      <div className="table-responsive">
+                        <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                              <th style={{ padding: '8px', textAlign: 'left' }}>Parameter</th>
+                              <th style={{ padding: '8px', textAlign: 'left' }}>Observed Result</th>
+                              <th style={{ padding: '8px', textAlign: 'left' }}>Source Analyzer</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {!['Verified', 'Report Generated', 'Report Delivered'].includes(activeTaskForQC.status) ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label className="input-label-style">Technician/Pathologist Remarks</label>
-                      <textarea 
-                        rows="2"
-                        placeholder="Enter pathologist diagnosis remarks or guidelines..."
-                        value={qcRemarks}
-                        onChange={(e) => setQcRemarks(e.target.value)}
-                        className="select-input-style"
-                        style={{ minHeight: '60px', padding: '8px', fontSize: '12px' }}
-                      />
-                      <button 
-                        type="button" 
-                        onClick={handleQCVerify}
-                        className="btn btn-indigo"
-                        style={{ height: '40px', fontWeight: '800', width: '100%' }}
-                      >
-                        ✓ Verify & Release Consolidated Report
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                      <div className="badge badge-emerald" style={{ padding: '8px 16px', fontSize: '12px', display: 'inline-block', marginBottom: '14px', borderRadius: '8px' }}>
-                        ✓ Consolidated Diagnostic Report Verified
+                          </thead>
+                          <tbody>
+                            {activeTaskForQC.orderedTests.map(testName => {
+                              const res = activeTaskForQC.testResults[testName];
+                              const hasAbnormal = res?.val && (res.val.includes('High') || res.val.includes('Low') || res.val.includes('Diabetic') || res.val.includes('Elevated') || res.val.includes('Hypothyroidism'));
+                              return (
+                                <tr key={testName} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                  <td style={{ padding: '8px' }}><strong>{testName}</strong></td>
+                                  <td style={{ padding: '8px', color: hasAbnormal ? 'var(--rose)' : 'inherit', fontWeight: hasAbnormal ? '700' : 'normal', whiteSpace: 'pre-line' }}>
+                                    {res ? res.val : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Pending result...</span>}
+                                  </td>
+                                  <td style={{ padding: '8px', fontSize: '10.5px' }}>{res ? res.machine : '-'}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setPrintedTaskData(activeTaskForQC);
-                          setShowPrintReportModal(true);
-                        }}
-                        className="btn btn-indigo"
-                        style={{ height: '42px', fontWeight: '800', width: '100%' }}
-                      >
-                        🖨️ Generate Final A4 Report
-                      </button>
                     </div>
-                  )}
 
-                </div>
-              ) : printedTaskData ? (
+                    {activeTaskForQC.status === 'Pending Verification' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label className="input-label-style">Technician/Pathologist Remarks</label>
+                        <textarea 
+                          rows="2"
+                          placeholder="Enter pathologist diagnosis remarks or guidelines..."
+                          value={qcRemarks}
+                          onChange={(e) => setQcRemarks(e.target.value)}
+                          className="select-input-style"
+                          style={{ minHeight: '60px', padding: '8px', fontSize: '12px' }}
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleQCVerify}
+                          className="btn btn-indigo"
+                          style={{ height: '40px', fontWeight: '800', width: '100%' }}
+                        >
+                          ✓ Verify & Release Consolidated Report
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <span className="badge badge-emerald" style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}>
+                            ✓ QC Verified
+                          </span>
+                          {activeTaskForQC.status === 'Delivered' && (
+                            <span className="badge badge-sky" style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}>
+                              ✓ Report Delivered
+                            </span>
+                          )}
+                        </div>
+
+                        {isBlocked ? (
+                          <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1.5px solid var(--rose)', color: 'var(--rose)', padding: '12px', borderRadius: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px', margin: '6px 0', animation: 'fadeIn 0.2s' }}>
+                            <strong>⚠️ DELIVERY BLOCKED: PAYMENT PENDING</strong>
+                            <span>Report release is restricted. A balance of {currency}{balance} must be cleared at the billing desk before this report can be delivered.</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setPrintedTaskData(activeTaskForQC);
+                                setShowPrintReportModal(true);
+                              }}
+                              className="btn btn-indigo"
+                              style={{ height: '40px', fontWeight: '750', fontSize: '12px' }}
+                            >
+                              🖨️ Print A4 Report
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setWhatsAppRecipient(order?.phone || '9440183421');
+                                setWhatsAppMessage(`RK Clinic LIS: Dear ${activeTaskForQC.patientName}, your verified lab report is ready for download: https://rkclinic.in/r/${activeTaskForQC.taskId}`);
+                                setShowWhatsAppModal(true);
+                              }}
+                              className="btn btn-success"
+                              style={{ height: '40px', fontWeight: '750', fontSize: '12px', backgroundColor: '#25D366', color: '#FFF', border: 'none' }}
+                            >
+                              💬 Send via WhatsApp
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })() : printedTaskData ? (
                 <div style={{ textAlign: 'center', padding: '60px 0', animation: 'fadeIn 0.2s ease-out' }}>
                   <span style={{ fontSize: '32px' }}>🖨️</span>
                   <h4 style={{ margin: '12px 0 6px 0', fontSize: '14px', fontWeight: '800' }}>Report Verified for {printedTaskData.patientName}</h4>
@@ -1334,127 +2177,91 @@ export default function LaboratoryPanel() {
 
       case 'dashboard': // Upgraded LIS Dashboard View
       default:
-        const criticalAlerts = getCriticalAlerts();
-        
         return (
           <>
             {/* LIS Dashboard Counters */}
-            <div className="lab-dashboard-grid-6">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
               
-              {/* Card 1: Samples Received */}
+              {/* Card 1: New Orders */}
+              <div className="lab-card indigo" onClick={() => setLabActiveTab('registration')} style={{ cursor: 'pointer' }}>
+                <div className="lab-card-header">
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>📥</span></div>
+                  <span className="lab-card-title">New Orders</span>
+                </div>
+                <span className="lab-card-value">{labOrders.filter(o => o.status === 'Ordered').length}</span>
+              </div>
+
+              {/* Card 2: Pending Samples */}
+              <div className="lab-card amber" onClick={() => setLabActiveTab('registration')} style={{ cursor: 'pointer' }}>
+                <div className="lab-card-header">
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>🧪</span></div>
+                  <span className="lab-card-title">Pending Samples</span>
+                </div>
+                <span className="lab-card-value">{labOrders.filter(o => o.status === 'Accepted').length}</span>
+              </div>
+
+              {/* Card 3: Awaiting QC */}
+              <div className="lab-card emerald" onClick={() => setLabActiveTab('reports')} style={{ cursor: 'pointer' }}>
+                <div className="lab-card-header">
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>🛡️</span></div>
+                  <span className="lab-card-title">Awaiting QC</span>
+                </div>
+                <span className="lab-card-value">{labTasks.filter(t => t.status === 'Pending Verification' || t.status === 'QC Verification').length}</span>
+              </div>
+
+              {/* Card 4: Payment Pending */}
+              <div className="lab-card rose" onClick={() => setLabActiveTab('reports')} style={{ cursor: 'pointer' }}>
+                <div className="lab-card-header">
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>💳</span></div>
+                  <span className="lab-card-title">Payment Pending</span>
+                </div>
+                <span className="lab-card-value">{labOrders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid').length}</span>
+              </div>
+
+              {/* Card 5: Ready for Delivery */}
+              <div className="lab-card cyan" onClick={() => setLabActiveTab('reports')} style={{ cursor: 'pointer' }}>
+                <div className="lab-card-header">
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>✅</span></div>
+                  <span className="lab-card-title">Ready for Delivery</span>
+                </div>
+                <span className="lab-card-value">{labOrders.filter(o => o.status === 'Ready for Delivery').length}</span>
+              </div>
+
+              {/* Card 6: Delivered Today */}
+              <div className="lab-card teal" onClick={() => setLabActiveTab('reports')} style={{ cursor: 'pointer' }}>
+                <div className="lab-card-header">
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>📦</span></div>
+                  <span className="lab-card-title">Delivered Today</span>
+                </div>
+                <span className="lab-card-value">{labOrders.filter(o => o.status === 'Delivered').length}</span>
+              </div>
+
+              {/* Card 7: B2B Orders */}
               <div className="lab-card indigo">
                 <div className="lab-card-header">
-                  <div className="lab-card-icon-wrapper">
-                    <svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><path d="M8 10a2 2 0 0 1 2-2h4a2 2 0 0 1 0 4h-4a2 2 0 0 0 0 4h4a2 2 0 0 0 2-2"/></svg>
-                  </div>
-                  <span className="lab-card-title">Samples Received Today</span>
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>🏢</span></div>
+                  <span className="lab-card-title">B2B Orders</span>
                 </div>
-                <span className="lab-card-value">
-                  {labTasks.filter(t => t.status !== 'Pending').length}
-                </span>
-                <div className="lab-card-details">
-                  <div className="lab-card-detail-row">
-                    <span className="lab-card-detail-label">Total Volume</span>
-                    <span className="lab-card-detail-value">{labTasks.length} Cases</span>
-                  </div>
-                </div>
+                <span className="lab-card-value">{labOrders.filter(o => o.customerType && o.customerType !== 'Walk-in').length}</span>
               </div>
 
-              {/* Card 2: Samples Processing */}
-              <div className="lab-card emerald" onClick={() => setLabActiveTab('results')} style={{ cursor: 'pointer' }}>
+              {/* Card 8: B2C Orders */}
+              <div className="lab-card sky">
                 <div className="lab-card-header">
-                  <div className="lab-card-icon-wrapper">
-                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M6 3h12M12 3v7M9 12h6M5 21h14M19 21l-7-11L5 21z"/></svg>
-                  </div>
-                  <span className="lab-card-title">Samples Processing</span>
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>👤</span></div>
+                  <span className="lab-card-title">B2C Orders</span>
                 </div>
-                <span className="lab-card-value">
-                  {labTasks.filter(t => t.status === 'Processing').length}
-                </span>
-                <div className="lab-card-details">
-                  <div className="lab-card-detail-row">
-                    <span className="lab-card-detail-label">In Centrifuge</span>
-                    <span className="lab-card-detail-value">{labTasks.filter(t => t.status === 'Processing').length} Vials</span>
-                  </div>
-                </div>
+                <span className="lab-card-value">{labOrders.filter(o => !o.customerType || o.customerType === 'Walk-in').length}</span>
               </div>
 
-              {/* Card 3: Completed Reports */}
-              <div className="lab-card indigo" onClick={() => setLabActiveTab('reports')} style={{ cursor: 'pointer' }}>
-                <div className="lab-card-header">
-                  <div className="lab-card-icon-wrapper">
-                    <svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="7" r="4"/><path d="M2 21v-2a8 8 0 0 1 15-4"/></svg>
-                  </div>
-                  <span className="lab-card-title">Completed Reports</span>
-                </div>
-                <span className="lab-card-value">
-                  {labTasks.filter(t => t.status === 'Verified').length}
-                </span>
-                <div className="lab-card-details">
-                  <div className="lab-card-detail-row">
-                    <span className="lab-card-detail-label">Total Verified</span>
-                    <span className="lab-card-detail-value">{labTasks.filter(t => t.status === 'Verified').length}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 4: Pending Verification */}
-              <div className="lab-card amber" onClick={() => setLabActiveTab('reports')} style={{ cursor: 'pointer' }}>
-                <div className="lab-card-header">
-                  <div className="lab-card-icon-wrapper">
-                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  </div>
-                  <span className="lab-card-title">Pending Verification</span>
-                </div>
-                <span className="lab-card-value">
-                  {labTasks.filter(t => t.status === 'Pending Verification' || t.status === 'Machine Completed').length}
-                </span>
-                <div className="lab-card-details">
-                  <div className="lab-card-detail-row">
-                    <span className="lab-card-detail-label">QC Review</span>
-                    <span className="lab-card-detail-value">{labTasks.filter(t => t.status === 'Pending Verification').length} Queue</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 5: Delivered Reports */}
-              <div className="lab-card cyan">
-                <div className="lab-card-header">
-                  <div className="lab-card-icon-wrapper">
-                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
-                  </div>
-                  <span className="lab-card-title">Delivered Reports</span>
-                </div>
-                <span className="lab-card-value">
-                  {labTasks.filter(t => t.status === 'Verified').length + 42}
-                </span>
-                <div className="lab-card-details">
-                  <div className="lab-card-detail-row">
-                    <span className="lab-card-detail-label">EMR Dispatched</span>
-                    <span className="lab-card-detail-value">Continuous Sync</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 6: Connected Machines */}
+              {/* Card 9: Critical Alerts */}
               <div className="lab-card rose">
                 <div className="lab-card-header">
-                  <div className="lab-card-icon-wrapper">
-                    <svg viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  </div>
-                  <span className="lab-card-title">Connected Machines</span>
+                  <div className="lab-card-icon-wrapper"><span style={{ fontSize: '18px' }}>⚠️</span></div>
+                  <span className="lab-card-title">Critical Alerts</span>
                 </div>
-                <span className="lab-card-value">
-                  {analyzers.filter(a => a.status === 'Online').length}
-                </span>
-                <div className="lab-card-details">
-                  <div className="lab-card-detail-row">
-                    <span className="lab-card-detail-label">Active Ports</span>
-                    <span className="lab-card-detail-value">{analyzers.filter(a => a.status === 'Online').length} Online</span>
-                  </div>
-                </div>
+                <span className="lab-card-value">{labAlerts.filter(a => a.severity === 'Critical' || a.severity === 'High').length}</span>
               </div>
-
             </div>
 
             {/* ROW 2: MACHINE OVERVIEW, ACTIVE QUEUE, CRITICAL ALERTS */}
@@ -1658,26 +2465,127 @@ export default function LaboratoryPanel() {
 
             </div>
 
-            {/* Bottom logs console */}
-            <div className="panel-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <h3 style={{ fontSize: '13.5px', fontWeight: '800', margin: 0 }}>📺 Live Laboratory Information Feed (LIS Monitor)</h3>
-              <div style={{ backgroundColor: '#0f172a', color: '#38bdf8', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', fontSize: '11.5px', height: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', border: '1.5px solid #1e293b' }}>
-                {lisLogs.map(log => (
-                  <div key={log.id} style={{ borderBottom: '1px solid #1e293b', paddingBottom: '3px' }}>
-                    <span style={{ color: '#64748b' }}>[{log.time}]</span>{' '}
-                    <span style={{ 
-                      color: log.type === 'success' ? '#34d399' : 
-                             log.type === 'warning' ? '#f59e0b' : 
-                             log.type === 'sys' ? '#a78bfa' : '#38bdf8' 
-                    }}>
-                      {log.text}
-                    </span>
+            {/* Bottom logs console & Scanner Simulator */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', marginTop: '20px' }}>
+              
+              {/* LIS Monitor terminal log */}
+              <div className="panel-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <h3 style={{ fontSize: '13.5px', fontWeight: '800', margin: 0 }}>📺 Live Laboratory Information Feed (LIS Monitor)</h3>
+                <div style={{ backgroundColor: '#0f172a', color: '#38bdf8', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', fontSize: '11.5px', height: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', border: '1.5px solid #1e293b' }}>
+                  {lisLogs.map(log => (
+                    <div key={log.id} style={{ borderBottom: '1px solid #1e293b', paddingBottom: '3px' }}>
+                      <span style={{ color: '#64748b' }}>[{log.time}]</span>{' '}
+                      <span style={{ 
+                        color: log.type === 'success' ? '#34d399' : 
+                               log.type === 'warning' ? '#f59e0b' : 
+                               log.type === 'sys' ? '#a78bfa' : '#38bdf8' 
+                      }}>
+                        {log.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* LIS Barcode Scanner Simulator */}
+              <div className="panel-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', border: '1.5px solid rgba(79, 70, 229, 0.15)' }}>
+                <h3 style={{ fontSize: '13.5px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🏷️ Mock LIS Machine Barcode Scanner</span>
+                  <span className="badge badge-indigo" style={{ fontSize: '8.5px', padding: '2px 6px' }}>Hardware Simulator</span>
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                  {/* Select specimen or type custom barcode */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>Select Specimen Container Barcode</label>
+                    <select
+                      value={simBarcode}
+                      onChange={(e) => setSimBarcode(e.target.value)}
+                      className="select-input-style"
+                      style={{ padding: '6px 10px', fontSize: '11.5px' }}
+                    >
+                      <option value="">-- Choose specimen barcode in system --</option>
+                      {labTasks
+                        .filter(t => t.specimenId && !['Verified', 'Delivered'].includes(t.status))
+                        .map(t => (
+                          <option key={t.taskId} value={t.specimenId}>
+                            {t.specimenId} ({t.patientName} - {t.orderedTests.join(', ')}) [Status: {t.status}]
+                          </option>
+                        ))
+                      }
+                    </select>
                   </div>
-                ))}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {/* Select Machine */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>Select Analyzer Machine</label>
+                      <select
+                        value={simMachineId}
+                        onChange={(e) => setSimMachineId(e.target.value)}
+                        className="select-input-style"
+                        style={{ padding: '6px 10px', fontSize: '11.5px' }}
+                      >
+                        <option value="weldon">Weldon Biochemistry</option>
+                        <option value="maglumi">Maglumi 800 (Thyroid)</option>
+                        <option value="hematology">Hematology Analyzer</option>
+                        <option value="urine">Urine Analyzer</option>
+                        <option value="electrolyte">Electrolyte Analyzer</option>
+                        <option value="rapid">Rapid Test Analyzer (CRP)</option>
+                      </select>
+                    </div>
+
+                    {/* Manual barcode input */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>Manual Barcode Input</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. RKLAB-0001"
+                        value={simBarcode}
+                        onChange={(e) => setSimBarcode(e.target.value)}
+                        style={{ padding: '5px 10px', fontSize: '11.5px', height: '32px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ height: '34px', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}
+                    onClick={handleSimulateScan}
+                  >
+                    ⚡ Simulate Barcode Scan on Machine
+                  </button>
+
+                  {/* Status/result display */}
+                  {simStatusMessage && (
+                    <div style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      marginTop: '4px',
+                      backgroundColor: simStatusSeverity === 'success' ? 'rgba(16, 185, 129, 0.08)' : simStatusSeverity === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(244, 63, 94, 0.08)',
+                      color: simStatusSeverity === 'success' ? 'var(--emerald)' : simStatusSeverity === 'warning' ? 'var(--amber)' : 'var(--rose)',
+                      border: simStatusSeverity === 'success' ? '1px solid rgba(16, 185, 129, 0.2)' : simStatusSeverity === 'warning' ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(244, 63, 94, 0.2)',
+                      fontWeight: '500'
+                    }}>
+                      {simStatusMessage}
+                    </div>
+                  )}
+
+                </div>
               </div>
             </div>
           </>
         );
+      case 'order_entry':
+        return <LabOrderEntryTab />;
+      case 'b2b_partners':
+        return <B2BPartnersTab />;
+      case 'audit_logs':
+        return <AuditLogsTab />;
       case 'inventory':
         return <LabInventoryTab />;
     }
@@ -1685,9 +2593,12 @@ export default function LaboratoryPanel() {
 
   const tabs = [
     { id: 'dashboard', label: 'LIS Dashboard' },
+    { id: 'order_entry', label: 'Workstation Ordering' },
     { id: 'registration', label: 'Assistant Workstation' },
     { id: 'results', label: 'Analyzer Port' },
     { id: 'reports', label: 'Pathologist QC' },
+    { id: 'b2b_partners', label: 'B2B Partners' },
+    { id: 'audit_logs', label: 'Audit Logs' },
     { id: 'inventory', label: 'Lab Inventory' }
   ];
 
@@ -2007,69 +2918,71 @@ export default function LaboratoryPanel() {
 
               {/* Merged tests parameter grid */}
               <div style={{ marginBottom: '16px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f1f5f9', borderTop: '1px solid #94a3b8', borderBottom: '1px solid #94a3b8', fontWeight: 'bold', textAlign: 'left' }}>
-                      <th style={{ padding: '6px 8px' }}>Test Parameter / Analyte</th>
-                      <th style={{ padding: '6px 8px' }}>Observed Result Value</th>
-                      <th style={{ padding: '6px 8px' }}>Standard Reference Range</th>
-                      <th style={{ padding: '6px 8px' }}>Flag / Unit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printedTaskData.orderedTests.map(testName => {
-                      const res = printedTaskData.testResults[testName];
-                      const isHigh = res?.val && res.val.includes('High');
-                      const isLow = res?.val && res.val.includes('Low');
-                      const isDiabetic = res?.val && res.val.includes('Diabetic');
-                      const hasFlag = isHigh || isLow || isDiabetic;
-
-                      // Destructure parameter list if it contains newlines
-                      const lines = res ? res.val.split('\n') : ['Awaiting analyzer run...'];
-
-                      return lines.map((line, idx) => {
-                        // Extract observed value and ranges
-                        const detailMatch = line.match(/(.*?):\s*([0-9.]+)\s*([a-zA-Z/%<>\s]+)?\((Ref:\s*[^)]+)\)?/i) || 
-                                            line.match(/(.*?):\s*([0-9.]+)\s*([a-zA-Z/%<>\s()]+)?\((Normal:\s*[^)]+)\)?/i);
-                        
-                        let paramName = line.split(':')[0] || testName;
-                        let obsValue = line.split(':')[1] || '';
-                        let refRange = 'Standard clinical bounds';
-                        let flagText = '-';
-
-                        if (detailMatch) {
-                          paramName = detailMatch[1];
-                          obsValue = detailMatch[2] + (detailMatch[3] ? ' ' + detailMatch[3].replace('(High)', '').replace('(Low)', '').replace('(Diabetic)', '').trim() : '');
-                          refRange = detailMatch[4];
-                        }
-
-                        if (hasFlag) {
-                          if (isHigh || line.includes('High')) flagText = 'H (High)';
-                          else if (isLow || line.includes('Low')) flagText = 'L (Low)';
-                          else if (isDiabetic || line.includes('Diabetic')) flagText = 'A (Abnormal)';
-                        }
-
-                        return (
-                          <tr key={`${testName}-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                            <td style={{ padding: '6px 8px' }}>
-                              {idx === 0 ? <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '2px', fontSize: '11.5px' }}>{testName}</strong> : null}
-                              <span style={{ paddingLeft: idx === 0 ? '0' : '10px', color: '#334155' }}>{paramName}</span>
-                            </td>
-                            <td style={{ padding: '6px 8px', fontWeight: hasFlag ? 'bold' : 'normal', color: hasFlag ? '#dc2626' : '#0f172a' }}>
-                              {obsValue}
-                            </td>
-                            <td style={{ padding: '6px 8px', color: '#64748b', fontStyle: 'italic' }}>
-                              {refRange}
-                            </td>
-                            <td style={{ padding: '6px 8px', fontWeight: 'bold', color: hasFlag ? '#dc2626' : '#64748b' }}>
-                              {flagText}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })}
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f1f5f9', borderTop: '1px solid #94a3b8', borderBottom: '1px solid #94a3b8', fontWeight: 'bold', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 8px' }}>Test Parameter / Analyte</th>
+                        <th style={{ padding: '6px 8px' }}>Observed Result Value</th>
+                        <th style={{ padding: '6px 8px' }}>Standard Reference Range</th>
+                        <th style={{ padding: '6px 8px' }}>Flag / Unit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {printedTaskData.orderedTests.map(testName => {
+                        const res = printedTaskData.testResults[testName];
+                        const isHigh = res?.val && res.val.includes('High');
+                        const isLow = res?.val && res.val.includes('Low');
+                        const isDiabetic = res?.val && res.val.includes('Diabetic');
+                        const hasFlag = isHigh || isLow || isDiabetic;
+  
+                        // Destructure parameter list if it contains newlines
+                        const lines = res ? res.val.split('\n') : ['Awaiting analyzer run...'];
+  
+                        return lines.map((line, idx) => {
+                          // Extract observed value and ranges
+                          const detailMatch = line.match(/(.*?):\s*([0-9.]+)\s*([a-zA-Z/%<>\s]+)?\((Ref:\s*[^)]+)\)?/i) || 
+                                              line.match(/(.*?):\s*([0-9.]+)\s*([a-zA-Z/%<>\s()]+)?\((Normal:\s*[^)]+)\)?/i);
+                          
+                          let paramName = line.split(':')[0] || testName;
+                          let obsValue = line.split(':')[1] || '';
+                          let refRange = 'Standard clinical bounds';
+                          let flagText = '-';
+  
+                          if (detailMatch) {
+                            paramName = detailMatch[1];
+                            obsValue = detailMatch[2] + (detailMatch[3] ? ' ' + detailMatch[3].replace('(High)', '').replace('(Low)', '').replace('(Diabetic)', '').trim() : '');
+                            refRange = detailMatch[4];
+                          }
+  
+                          if (hasFlag) {
+                            if (isHigh || line.includes('High')) flagText = 'H (High)';
+                            else if (isLow || line.includes('Low')) flagText = 'L (Low)';
+                            else if (isDiabetic || line.includes('Diabetic')) flagText = 'A (Abnormal)';
+                          }
+  
+                          return (
+                            <tr key={`${testName}-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                              <td style={{ padding: '6px 8px' }}>
+                                {idx === 0 ? <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '2px', fontSize: '11.5px' }}>{testName}</strong> : null}
+                                <span style={{ paddingLeft: idx === 0 ? '0' : '10px', color: '#334155' }}>{paramName}</span>
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: hasFlag ? 'bold' : 'normal', color: hasFlag ? '#dc2626' : '#0f172a' }}>
+                                {obsValue}
+                              </td>
+                              <td style={{ padding: '6px 8px', color: '#64748b', fontStyle: 'italic' }}>
+                                {refRange}
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold', color: hasFlag ? '#dc2626' : '#64748b' }}>
+                                {flagText}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Remarks */}
@@ -2092,6 +3005,80 @@ export default function LaboratoryPanel() {
                 </div>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+      {/* WhatsApp Simulation Modal */}
+      {showWhatsAppModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="panel-card" style={{ width: '420px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            
+            {/* WhatsApp Header branding */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontSize: '20px', fontWeight: 'bold' }}>
+                💬
+              </div>
+              <div>
+                <strong style={{ fontSize: '14.5px', color: '#0f172a' }}>WhatsApp Report Dispatch</strong><br />
+                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold' }}>● Simulated API Channel</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+              <div>
+                <label className="input-label-style">Recipient Mobile Number</label>
+                <input 
+                  type="tel"
+                  value={whatsAppRecipient}
+                  onChange={(e) => setWhatsAppRecipient(e.target.value)}
+                  className="select-input-style"
+                  placeholder="Recipient Mobile"
+                />
+              </div>
+
+              {/* Chat Message Bubble Preview */}
+              <div>
+                <label className="input-label-style">Message Preview</label>
+                <div style={{ backgroundColor: '#efeae2', padding: '16px', borderRadius: '10px', border: '1px solid #cbd5e1', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#d9fdd3', padding: '10px', borderRadius: '8px', border: '1px solid #d1f4cc', fontSize: '12px', color: '#303030', maxWidth: '90%', marginLeft: 'auto', position: 'relative', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>
+                    <span>{whatsAppMessage}</span>
+                    <span style={{ fontSize: '9px', color: '#8696a0', textAlign: 'right', display: 'block', marginTop: '4px' }}>
+                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓✓
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button 
+                onClick={() => {
+                  deliverLabReport(activeTaskForQC.taskId, 'Patient (WhatsApp)');
+                  alert(`WhatsApp report dispatched successfully to ${whatsAppRecipient}!`);
+                  addLisLog(`WhatsApp report dispatched for order ${activeTaskForQC.taskId}`, 'success');
+                  setShowWhatsAppModal(false);
+                  
+                  // Reload active qc task locally with Delivered status
+                  setActiveTaskForQC(prev => ({
+                    ...prev,
+                    status: 'Delivered'
+                  }));
+                }} 
+                className="btn btn-success"
+                style={{ flex: 1, height: '36px', fontSize: '12px', fontWeight: 'bold', backgroundColor: '#25D366', color: '#FFF', border: 'none' }}
+              >
+                🚀 Confirm & Send
+              </button>
+              <button 
+                onClick={() => {
+                  setShowWhatsAppModal(false);
+                }} 
+                className="btn btn-secondary"
+                style={{ flex: 1, height: '36px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
             </div>
 
           </div>

@@ -13,8 +13,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "RK Clinic - Healthcare Management Dashboard",
-  description: "Premium Healthcare Management System Dashboard",
+  title: "RK Clinic - Laboratory Workflow & Reporting System",
+  description: "Laboratory Workflow & Reporting System for RK Clinic — digital test ordering, sample tracking, result entry, verification and report delivery.",
+};
+
+/**
+ * Stated explicitly rather than relying on the framework default.
+ *
+ * Without `width=device-width` a phone renders the page at a notional desktop
+ * width and scales it down, so every table and control arrives too small to read
+ * or tap. Next does inject a sensible default, but this is load-bearing for
+ * mobile and worth being able to see in the source.
+ *
+ * `maximumScale` is deliberately absent: blocking pinch-zoom on a clinical app
+ * would stop someone enlarging a result value they need to read precisely, and
+ * it fails WCAG 1.4.4.
+ */
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }) {

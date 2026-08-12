@@ -33,25 +33,35 @@ export default function PharmacyPanel() {
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [billDiscountPercent, setBillDiscountPercent] = useState(0); // Global discount override
+  const [notice, setNotice] = useState(null);
+
+  const notify = (message, tone = 'info') => {
+    setNotice({ message, tone });
+  };
 
   const handleUploadImage = async (medId, imageUrl) => {
-    // Supabase Storage removed — accept a hosted URL directly
     try {
-      if (!imageUrl) { alert('Please enter a valid image URL.'); return; }
+      const nextUrl = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+      if (!nextUrl) {
+        notify('Please enter a valid image URL.', 'warning');
+        return;
+      }
+
       const res = await fetch(`/api/pharmacy/medicines/${medId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: imageUrl })
+        body: JSON.stringify({ image_url: nextUrl })
       });
-      if (res.ok) {
-        alert('Medicine image URL saved successfully!');
-        window.location.reload();
-      } else {
-        alert('Failed to save image URL.');
+
+      if (!res.ok) {
+        throw new Error('Failed to save image URL.');
       }
+
+      updateMedicine(medId, { image_url: nextUrl });
+      notify('Medicine image URL saved successfully.', 'success');
     } catch (err) {
       console.error(err);
-      alert('Update failed: ' + err.message);
+      notify(`Image update failed: ${err.message}`, 'error');
     }
   };
 
@@ -62,6 +72,12 @@ export default function PharmacyPanel() {
   const [heldBills, setHeldBills] = useState([]); // List of held bills
   const [loadedRx, setLoadedRx] = useState(null);
   const [ocrState, setOcrState] = useState('idle'); // 'idle', 'scanning', 'scanned'
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 2800);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
 
 
@@ -76,6 +92,23 @@ export default function PharmacyPanel() {
       return { name: match[1], strength: match[2] };
     }
     return { name: fullName, strength: '-' };
+  };
+
+  const promptForImageUrl = (med) => {
+    const imageUrl = window.prompt(`Paste a hosted image URL for ${med.name}`);
+    if (imageUrl) {
+      void handleUploadImage(med.id, imageUrl);
+    }
+  };
+
+  const getDaysUntilExpiry = (expiry) => {
+    if (!expiry) return null;
+    const expiryDate = new Date(expiry);
+    if (Number.isNaN(expiryDate.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiryDate.setHours(0, 0, 0, 0);
+    return Math.ceil((expiryDate.getTime() - today.getTime()) / 86400000);
   };
 
   // Medicine list categories
@@ -157,12 +190,7 @@ export default function PharmacyPanel() {
     if (med) {
       handleAddToBill(med);
       setBarcodeQuery('');
-      // Notification visual pop
-      const toast = document.createElement('div');
-      toast.className = 'scanned-toast';
-      toast.innerText = `Scanned: ${med.name} added to bill.`;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
+      notify(`Scanned: ${med.name} added to bill.`, 'success');
     } else {
       alert(`No medicine matching barcode or batch reference "${barcodeQuery}" found.`);
     }
@@ -214,6 +242,8 @@ export default function PharmacyPanel() {
     }
     return 0;
   };
+
+  const lowStockCount = inventory.filter(med => med.stock > 0 && med.stock <= med.threshold).length;
 
   // Helper to find prescription by Prescription ID, Patient ID, or Token number
   const findPrescriptionByIdentifier = (val) => {
@@ -315,7 +345,7 @@ export default function PharmacyPanel() {
     };
     setHeldBills([...heldBills, newHold]);
     handleNewBill();
-    alert(`Current bill put on hold. Ticket ID: ${newHold.holdId}`);
+    notify(`Current bill put on hold. Ticket ID: ${newHold.holdId}`, 'success');
   };
 
   const handleRestoreBill = (holdItem) => {
@@ -326,6 +356,7 @@ export default function PharmacyPanel() {
     setBillDiscountPercent(holdItem.discountPercent);
     setPaymentMethod(holdItem.paymentMethod);
     setHeldBills(prev => prev.filter(h => h.holdId !== holdItem.holdId));
+    notify(`Restored held bill ${holdItem.holdId}.`, 'info');
   };
 
   // Transaction billing processors
@@ -353,7 +384,7 @@ export default function PharmacyPanel() {
 
     // Create invoice in clinic state
     const billId = createInvoice(patientId, invoiceItems, paymentMethod, 'Paid');
-    alert(`Success: Invoice ${billId} generated in Paid status.`);
+    notify(`Invoice ${billId} generated in Paid status.`, 'success');
     return billId;
   };
 
@@ -395,7 +426,7 @@ export default function PharmacyPanel() {
     // Clear bill
     handleNewBill();
     
-    alert("Medicines successfully dispensed. Stocks decremented. Ready to print receipt.");
+    notify('Medicines successfully dispensed. Ready to print receipt.', 'success');
     setShowPrintReceiptModal(true);
   };
 
@@ -647,6 +678,24 @@ export default function PharmacyPanel() {
           border: 1px solid var(--border-color);
           background-color: #fcfbf7;
         }
+
+        .pharmacy-notice {
+          border-radius: 12px;
+          border: 1px solid var(--border-color);
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .pharmacy-notice strong {
+          display: block;
+          font-size: 12px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
       `}</style>
 
       {/* HEADER WELCOME BANNER */}
@@ -679,10 +728,10 @@ export default function PharmacyPanel() {
 
         {/* Card 3: Medicines Dispensed */}
         <div className="summary-card">
-          <div className="summary-icon-box" style={{ backgroundColor: 'rgba(56, 189, 248, 0.08)', color: 'var(--sky)' }}>💊</div>
+          <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.08)', color: 'var(--amber)' }}>⚠️</div>
           <div className="summary-text-box">
-            <span className="summary-label">Dispensed Items</span>
-            <span className="summary-value">178 Units</span>
+            <span className="summary-label">Low Stock Medicines</span>
+            <span className="summary-value">{lowStockCount}</span>
           </div>
         </div>
 
@@ -732,6 +781,28 @@ export default function PharmacyPanel() {
           </button>
         </div>
       </div>
+
+      {notice && (
+        <div
+          className="pharmacy-notice"
+          style={{
+            backgroundColor:
+              notice.tone === 'success' ? 'rgba(16, 185, 129, 0.08)' : notice.tone === 'error' ? 'rgba(244, 63, 94, 0.08)' : notice.tone === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(79, 70, 229, 0.06)',
+            borderColor:
+              notice.tone === 'success' ? 'rgba(16, 185, 129, 0.18)' : notice.tone === 'error' ? 'rgba(244, 63, 94, 0.18)' : notice.tone === 'warning' ? 'rgba(245, 158, 11, 0.18)' : 'var(--border-color)',
+            color:
+              notice.tone === 'success' ? 'var(--emerald)' : notice.tone === 'error' ? 'var(--rose)' : notice.tone === 'warning' ? 'var(--amber)' : 'var(--primary)'
+          }}
+        >
+          <div>
+            <strong>{notice.tone}</strong>
+            <span style={{ fontSize: '12px', fontWeight: '600' }}>{notice.message}</span>
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={() => setNotice(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Display Held Bills if any exist */}
       {heldBills.length > 0 && (
@@ -832,17 +903,9 @@ export default function PharmacyPanel() {
                             style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--border-color)' }} 
                           />
                         ) : (
-                          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '4px', backgroundColor: 'var(--bg-primary)', border: '1.5px dashed var(--border-color)', margin: 0 }}>
+                          <button type="button" onClick={() => promptForImageUrl(med)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '4px', backgroundColor: 'var(--bg-primary)', border: '1.5px dashed var(--border-color)', margin: 0, padding: 0 }}>
                             <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', stroke: 'var(--text-muted)', fill: 'none', strokeWidth: '2' }}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              style={{ display: 'none' }} 
-                              onChange={e => {
-                                if (e.target.files?.[0]) handleUploadImage(med.id, e.target.files[0]);
-                              }}
-                            />
-                          </label>
+                          </button>
                         )}
                         <div>
                           <strong>{parsed.name}</strong>
@@ -864,7 +927,16 @@ export default function PharmacyPanel() {
                         {currency}{med.price.toFixed(2)}
                       </td>
                       <td style={{ fontSize: '11px', color: isLow ? 'var(--amber)' : 'var(--text-secondary)' }}>
-                        {med.expiry || '2027-12-31'}
+                        <div>{med.expiry || '2027-12-31'}</div>
+                        {getDaysUntilExpiry(med.expiry) !== null && (
+                          <div style={{ marginTop: '4px' }}>
+                            {getDaysUntilExpiry(med.expiry) < 0 ? (
+                              <span className="stock-badge stock-out">Expired</span>
+                            ) : getDaysUntilExpiry(med.expiry) <= 90 ? (
+                              <span className="stock-badge stock-lowstock">Expires in {getDaysUntilExpiry(med.expiry)}d</span>
+                            ) : null}
+                          </div>
+                        )}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <button 
@@ -879,6 +951,13 @@ export default function PharmacyPanel() {
                     </tr>
                   );
                 })}
+                {filteredMeds.length === 0 && (
+                  <tr>
+                    <td colSpan="7" style={{ padding: '28px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No medicines match the current search or category filter.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1119,12 +1198,7 @@ export default function PharmacyPanel() {
                             }
                           });
                           setBillItems(itemsToAdd);
-                          // Show a nice feedback
-                          const toast = document.createElement('div');
-                          toast.className = 'scanned-toast';
-                          toast.innerHTML = '⚡ Billing Table Autofilled with Prescribed Medicines!';
-                          document.body.appendChild(toast);
-                          setTimeout(() => toast.remove(), 2500);
+                          notify('Billing table autofilled with prescribed medicines.', 'success');
                         }}
                         className="btn btn-indigo"
                         style={{ 
@@ -1154,79 +1228,81 @@ export default function PharmacyPanel() {
 
           {/* Bill items table */}
           <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--bg-primary)', borderBottom: '1.5px solid var(--border-color)', color: 'var(--text-secondary)', fontWeight: '700' }}>
-                  <th style={{ padding: '8px', textAlign: 'left' }}>Medicine</th>
-                  <th style={{ padding: '8px', textAlign: 'center' }}>Qty</th>
-                  <th style={{ padding: '8px', textAlign: 'right' }}>Rate</th>
-                  <th style={{ padding: '8px', textAlign: 'center' }}>Disc %</th>
-                  <th style={{ padding: '8px', textAlign: 'right' }}>Total</th>
-                  <th style={{ padding: '8px', textAlign: 'center' }}>X</th>
-                </tr>
-              </thead>
-              <tbody>
-                {billItems.map((item, idx) => {
-                  const rowTotal = item.qty * item.rate * (1 - item.discount / 100);
-                  return (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '8px' }}>
-                        <strong>{item.name}</strong>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.strength}</div>
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--bg-primary)', borderBottom: '1.5px solid var(--border-color)', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                    <th style={{ padding: '8px', textAlign: 'left' }}>Medicine</th>
+                    <th style={{ padding: '8px', textAlign: 'center' }}>Qty</th>
+                    <th style={{ padding: '8px', textAlign: 'right' }}>Rate</th>
+                    <th style={{ padding: '8px', textAlign: 'center' }}>Disc %</th>
+                    <th style={{ padding: '8px', textAlign: 'right' }}>Total</th>
+                    <th style={{ padding: '8px', textAlign: 'center' }}>X</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billItems.map((item, idx) => {
+                    const rowTotal = item.qty * item.rate * (1 - item.discount / 100);
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '8px' }}>
+                          <strong>{item.name}</strong>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.strength}</div>
+                        </td>
+                        <td style={{ padding: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                            <button 
+                              type="button" 
+                              className="btn btn-secondary btn-sm" 
+                              onClick={() => handleUpdateQty(idx, item.qty - 1)}
+                              style={{ padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              -
+                            </button>
+                            <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: '750' }}>{item.qty}</span>
+                            <button 
+                              type="button" 
+                              className="btn btn-secondary btn-sm" 
+                              onClick={() => handleUpdateQty(idx, item.qty + 1)}
+                              style={{ padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right' }}>{currency}{item.rate.toFixed(2)}</td>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                          <input
+                            type="number"
+                            value={item.discount}
+                            onChange={(e) => handleUpdateItemDiscount(idx, e.target.value)}
+                            style={{ width: '42px', textAlign: 'center', height: '24px', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '11px' }}
+                          />
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: '700' }}>{currency}{rowTotal.toFixed(2)}</td>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
                           <button 
                             type="button" 
-                            className="btn btn-secondary btn-sm" 
-                            onClick={() => handleUpdateQty(idx, item.qty - 1)}
-                            style={{ padding: '2px 6px', fontSize: '10px' }}
+                            onClick={() => handleRemoveItem(idx)}
+                            style={{ background: 'none', border: 'none', color: 'var(--rose)', fontWeight: '800', cursor: 'pointer', fontSize: '14px' }}
                           >
-                            -
+                            ×
                           </button>
-                          <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: '750' }}>{item.qty}</span>
-                          <button 
-                            type="button" 
-                            className="btn btn-secondary btn-sm" 
-                            onClick={() => handleUpdateQty(idx, item.qty + 1)}
-                            style={{ padding: '2px 6px', fontSize: '10px' }}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right' }}>{currency}{item.rate.toFixed(2)}</td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <input
-                          type="number"
-                          value={item.discount}
-                          onChange={(e) => handleUpdateItemDiscount(idx, e.target.value)}
-                          style={{ width: '42px', textAlign: 'center', height: '24px', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '11px' }}
-                        />
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: '700' }}>{currency}{rowTotal.toFixed(2)}</td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveItem(idx)}
-                          style={{ background: 'none', border: 'none', color: 'var(--rose)', fontWeight: '800', cursor: 'pointer', fontSize: '14px' }}
-                        >
-                          ×
-                        </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+  
+                  {billItems.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        Bill Items Cart is empty. Add medicines from the left catalog panel.
                       </td>
                     </tr>
-                  );
-                })}
-
-                {billItems.length === 0 && (
-                  <tr>
-                    <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      Bill Items Cart is empty. Add medicines from the left catalog panel.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Pricing auto-calculations */}
@@ -1332,7 +1408,7 @@ export default function PharmacyPanel() {
               className="btn btn-secondary" 
               onClick={() => {
                 if (billItems.length === 0) return alert("Empty Cart.");
-                const mockBill = {
+                const previewBill = {
                   invoiceId: `BILL-PH-${Math.floor(10000 + Math.random() * 90000)}`,
                   patientId: patientId || 'WALK-IN',
                   patientName: patientName || 'Walk-in Customer',
@@ -1346,7 +1422,7 @@ export default function PharmacyPanel() {
                   amountReceived: amountReceived || getGrandTotal(),
                   changeReturn: getChangeReturn()
                 };
-                setPrintedBillData(mockBill);
+                setPrintedBillData(previewBill);
                 setShowPrintReceiptModal(true);
               }}
               disabled={billItems.length === 0}
@@ -1455,29 +1531,31 @@ export default function PharmacyPanel() {
                 <div><strong>Date/Time:</strong> {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '8px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px dashed #000', textAlign: 'left', fontWeight: 'bold' }}>
-                    <th style={{ padding: '4px 0' }}>Item (Form)</th>
-                    <th style={{ padding: '4px 0', textAlign: 'center' }}>Qty</th>
-                    <th style={{ padding: '4px 0', textAlign: 'right' }}>Rate</th>
-                    <th style={{ padding: '4px 0', textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {printedBillData.items.map((item, idx) => {
-                    const rowTotal = item.qty * item.rate * (1 - item.discount / 100);
-                    return (
-                      <tr key={idx}>
-                        <td style={{ padding: '4px 0' }}>{item.name} {item.strength}</td>
-                        <td style={{ padding: '4px 0', textAlign: 'center' }}>{item.qty}</td>
-                        <td style={{ padding: '4px 0', textAlign: 'right' }}>{currency}{item.rate.toFixed(2)}</td>
-                        <td style={{ padding: '4px 0', textAlign: 'right' }}>{currency}{rowTotal.toFixed(2)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '8px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px dashed #000', textAlign: 'left', fontWeight: 'bold' }}>
+                      <th style={{ padding: '4px 0' }}>Item (Form)</th>
+                      <th style={{ padding: '4px 0', textAlign: 'center' }}>Qty</th>
+                      <th style={{ padding: '4px 0', textAlign: 'right' }}>Rate</th>
+                      <th style={{ padding: '4px 0', textAlign: 'right' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printedBillData.items.map((item, idx) => {
+                      const rowTotal = item.qty * item.rate * (1 - item.discount / 100);
+                      return (
+                        <tr key={idx}>
+                          <td style={{ padding: '4px 0' }}>{item.name} {item.strength}</td>
+                          <td style={{ padding: '4px 0', textAlign: 'center' }}>{item.qty}</td>
+                          <td style={{ padding: '4px 0', textAlign: 'right' }}>{currency}{item.rate.toFixed(2)}</td>
+                          <td style={{ padding: '4px 0', textAlign: 'right' }}>{currency}{rowTotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               <div style={{ borderTop: '1px dashed #000', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>

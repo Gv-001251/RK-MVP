@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import { query } from '@/lib/mysql/db';
@@ -28,7 +29,14 @@ export async function POST(request) {
     const body = await request.json();
 
     const email = body.email || body.username;
-    const password = body.password || 'rkclinic@123';
+
+    // A fixed fallback ('rkclinic@123') used to be applied to every account
+    // created without an explicit password. One published default across an
+    // entire clinic means any staff member can sign in as any colleague who has
+    // not yet changed theirs — including a role with more access than their own.
+    // A generated password is returned once instead, for the admin to hand over.
+    const generatedPassword = body.password ? null : crypto.randomBytes(9).toString('base64url');
+    const password = body.password || generatedPassword;
 
     if (!email || !body.fullName || !body.role) {
       return Response.json({ error: 'Missing required profile fields' }, { status: 400 });
@@ -63,7 +71,14 @@ export async function POST(request) {
       request,
     });
 
-    return Response.json({ user: newProfile }, { status: 201 });
+    // Returned exactly once, and only when we generated it — it is not stored in
+    // recoverable form anywhere, so the admin must pass it on now.
+    return Response.json(
+      generatedPassword
+        ? { user: newProfile, generatedPassword, note: 'Shown once. Give this to the user and have them change it.' }
+        : { user: newProfile },
+      { status: 201 }
+    );
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
       return Response.json({ error: 'Email already exists' }, { status: 409 });

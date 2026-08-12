@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS patients (
   phone              VARCHAR(50),
   email              VARCHAR(255),
   blood_group        VARCHAR(10),
-  allergies          TEXT         DEFAULT 'None',
+  allergies          TEXT,
   address            TEXT,
   emergency_contact  VARCHAR(255),
   dob                VARCHAR(20),
@@ -175,17 +175,25 @@ CREATE TABLE IF NOT EXISTS lab_orders (
   notes             TEXT,
   sample_type       VARCHAR(100),
   collected_by      VARCHAR(255),
-  collection_time   VARCHAR(50),
+  collection_time   DATETIME,
   machine_assigned  VARCHAR(100),
   processing_status VARCHAR(50)  DEFAULT 'Pending',
   result_source     VARCHAR(50)  DEFAULT 'Manual Entry',
-  registered_at     VARCHAR(50),
-  analyzer_started_at VARCHAR(50),
-  qc_started_at     VARCHAR(50),
-  report_generated_at VARCHAR(50),
-  report_delivered_at VARCHAR(50),
+  registered_at     DATETIME,
+  analyzer_started_at DATETIME,
+  qc_started_at     DATETIME,
+  report_generated_at DATETIME,
+  report_delivered_at DATETIME,
   report_delivered_to VARCHAR(255),
-  order_time        VARCHAR(50),
+  order_time        DATETIME,
+  payment_status    VARCHAR(50)  DEFAULT 'Unpaid',
+  total_charges     DECIMAL(10,2) DEFAULT 0.00,
+  discount          DECIMAL(10,2) DEFAULT 0.00,
+  amount_paid       DECIMAL(10,2) DEFAULT 0.00,
+  balance           DECIMAL(10,2) DEFAULT 0.00,
+  invoice_id        VARCHAR(50),
+  partner_id        VARCHAR(50),
+  customer_type     VARCHAR(50)  DEFAULT 'Walk-in',
   created_at        DATETIME     DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
@@ -216,10 +224,13 @@ CREATE TABLE IF NOT EXISTS lab_tasks (
   status            VARCHAR(50)  DEFAULT 'Ordered',
   priority          VARCHAR(20)  DEFAULT 'Routine',
   verified_by       VARCHAR(255),
-  verified_at       VARCHAR(50),
+  verified_at       DATETIME,
   remarks           TEXT,
-  report_generated_at VARCHAR(50),
-  report_delivered_at VARCHAR(50),
+  registered_at     DATETIME,
+  analyzer_started_at DATETIME,
+  qc_started_at     DATETIME,
+  report_generated_at DATETIME,
+  report_delivered_at DATETIME,
   report_delivered_to VARCHAR(255),
   processing_status VARCHAR(50),
   created_at        DATETIME     DEFAULT CURRENT_TIMESTAMP,
@@ -233,7 +244,7 @@ CREATE TABLE IF NOT EXISTS lab_task_tests (
   test_name    VARCHAR(255) NOT NULL,
   result_value TEXT,
   machine_name VARCHAR(100),
-  completed_at VARCHAR(50),
+  completed_at DATETIME,
   created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (lab_task_id) REFERENCES lab_tasks(id) ON DELETE CASCADE
 );
@@ -253,7 +264,7 @@ CREATE TABLE IF NOT EXISTS lab_alerts (
   severity         VARCHAR(20)  DEFAULT 'High',
   acknowledged     TINYINT(1)   DEFAULT 0,
   acknowledged_by  VARCHAR(255),
-  acknowledged_at  VARCHAR(50),
+  acknowledged_at  DATETIME,
   created_at       DATETIME     DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
 );
@@ -288,6 +299,9 @@ CREATE TABLE IF NOT EXISTS analyzer_connections (
   department   VARCHAR(100),
   protocol     VARCHAR(100),
   port         VARCHAR(100),
+  ip_address   VARCHAR(50),
+  com_port     VARCHAR(50),
+  baud_rate    INT,
   status       VARCHAR(20)  DEFAULT 'Offline',
   last_ping    DATETIME,
   health_score INT          DEFAULT 0,
@@ -295,14 +309,22 @@ CREATE TABLE IF NOT EXISTS analyzer_connections (
   updated_at   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-INSERT INTO analyzer_connections (id, name, department, protocol, port, status, health_score) VALUES
-  ('maglumi','Maglumi 800','Immunology (CLIA)','TCP/IP','192.168.1.101:9100','Online',98),
-  ('weldon','Weldon WB-150 Biochemistry Analyzer','Biochemistry','RS-232 Serial','COM3 / 9600 baud','Online',95),
-  ('hematology','Hematology Analyzer','Hematology','Ethernet','192.168.1.102:8080','Online',100),
-  ('urine','Urine Analyzer','Clinical Pathology','USB','USB-HID Device 0x04B4','Online',92),
-  ('electrolyte','Electrolyte Analyzer','Clinical Chemistry','TCP/IP','192.168.1.103:7001','Online',97),
-  ('rapid','Rapid Test Analyzer','Serology / POCT','RS-232 Serial','COM5 / 19200 baud','Online',90)
-ON DUPLICATE KEY UPDATE id=id;
+-- The 11 RK Clinic analyzers. Seeded 'Offline' (health 0); the LIS Bridge
+-- updates each to Online/Active live. Qualcyte 10 has no data interface, so it
+-- stays 'manual'. IDs match the bridge config so status upserts line up.
+INSERT INTO analyzer_connections (id, name, department, protocol, port, ip_address, com_port, baud_rate, status, health_score) VALUES
+  ('maglumi800',  'Snibe Maglumi 800',          'Immunoassay (CLIA)', 'RS-232 Serial', 'COM / 9600',  '-', '-', 9600, 'Offline', 0),
+  ('mispaplus',   'Mispa Plus',                 'Biochemistry',       'Ethernet',      'TCP :8081',   '-', '-', 0,    'Offline', 0),
+  ('hemat60',     'Hemat 60',                   'Hematology',         'Ethernet',      'TCP :8080',   '-', '-', 0,    'Offline', 0),
+  ('mbplus',      'MB+ Electrolyte Analyzer',   'Electrolyte',        'USB Serial',    'USB-serial',  '-', '-', 9600, 'Offline', 0),
+  ('uriplus300',  'Uriplus 300',                'Urinalysis',         'RS-232 Serial', 'COM / 9600',  '-', '-', 9600, 'Offline', 0),
+  ('rapidstar20', 'Rapid Star 20',              'POCT',               'USB Serial',    'USB-serial',  '-', '-', 9600, 'Offline', 0),
+  ('afinion2',    'Afinion 2 (Abbott)',         'Diabetes / POCT',    'Ethernet',      'TCP :8085',   '-', '-', 0,    'Offline', 0),
+  ('wondfo',      'Wondfo Rapid',               'POCT',               'Ethernet',      'TCP :8082',   '-', '-', 0,    'Offline', 0),
+  ('finecare',    'Finecare',                   'POCT',               'Ethernet',      'TCP :8083',   '-', '-', 0,    'Offline', 0),
+  ('weldonwb150', 'Weldon WB-150',              'Biochemistry',       'Ethernet',      'TCP :8084',   '-', '-', 0,    'Offline', 0),
+  ('qualcyte10',  'Qualcyte 10',                'Manual entry',       'None (printer)','-',           '-', '-', 0,    'manual',  0)
+ON DUPLICATE KEY UPDATE name=VALUES(name), department=VALUES(department), protocol=VALUES(protocol), port=VALUES(port);
 
 -- ============================================================================
 -- BARCODE TRACKING
@@ -311,11 +333,33 @@ CREATE TABLE IF NOT EXISTS barcode_tracking (
   id            CHAR(36)     NOT NULL PRIMARY KEY,
   lab_order_id  VARCHAR(30)  UNIQUE,
   barcode_value VARCHAR(255),
-  generated     TINYINT(1)   DEFAULT 0,
+  `generated`   TINYINT(1)   DEFAULT 0,
   generated_at  VARCHAR(50),
   printed       TINYINT(1)   DEFAULT 0,
   printed_at    VARCHAR(50),
   created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- ANALYZER MESSAGES
+-- Ingestion log for results pushed by the on-prem LIS Bridge. Serves three
+-- jobs at once: idempotency (message_id is unique), a raw-message audit trail,
+-- and a holding queue for results whose barcode matched no open order.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS lab_analyzer_messages (
+  id           CHAR(36)     NOT NULL PRIMARY KEY,
+  analyzer_id  VARCHAR(50),
+  message_id   VARCHAR(191) UNIQUE,             -- idempotency key from the bridge
+  specimen_id  VARCHAR(100),                    -- barcode scanned by the analyzer
+  lab_task_id  VARCHAR(30),                     -- matched order (null if unmatched)
+  matched      TINYINT(1)   DEFAULT 0,
+  tests_count  INT          DEFAULT 0,
+  status       VARCHAR(30)  DEFAULT 'received',  -- received | applied | unmatched | duplicate | error
+  note         TEXT,
+  raw          MEDIUMTEXT,                       -- original analyzer message, for audit
+  created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_lam_specimen (specimen_id),
+  INDEX idx_lam_matched (matched)
 );
 
 -- ============================================================================
@@ -537,4 +581,35 @@ CREATE TABLE IF NOT EXISTS patient_id_seq (
 
 CREATE TABLE IF NOT EXISTS invoice_id_seq (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
+);
+
+-- ============================================================================
+-- LIS B2B PARTNERS
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS lab_partners (
+  id              VARCHAR(50)  NOT NULL PRIMARY KEY,
+  name            VARCHAR(255) NOT NULL,
+  contact_person  VARCHAR(255),
+  mobile          VARCHAR(50),
+  address         TEXT,
+  gst             VARCHAR(50),
+  discount        DECIMAL(5,2) DEFAULT 0.00,
+  price_category  VARCHAR(50)  DEFAULT 'B2B',
+  created_at      DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- LIS RESULT EDIT AUDIT TRAIL
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS lab_result_edit_audits (
+  id              CHAR(36)     NOT NULL PRIMARY KEY,
+  lab_order_id    VARCHAR(30)  NOT NULL,
+  test_name       VARCHAR(255) NOT NULL,
+  parameter_name  VARCHAR(255) NOT NULL,
+  previous_value  TEXT,
+  updated_value   TEXT,
+  edited_by       VARCHAR(255),
+  edited_at       DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  reason          TEXT
 );

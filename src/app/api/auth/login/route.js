@@ -3,11 +3,23 @@ import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/mysql/db';
 import { writeAuditLog } from '@/lib/auth-middleware';
+import { resolveJwtSecret } from '@/lib/auth-config';
+import { rateLimit, clientIp } from '@/lib/rate-limit';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+const JWT_SECRET = resolveJwtSecret();
 
 export async function POST(request) {
   try {
+    // Throttle brute-force: 8 attempts / minute per IP, then a 5-minute lockout.
+    const ip = clientIp(request);
+    const rl = rateLimit(`login:${ip}`, { limit: 8, windowMs: 60_000, blockMs: 300_000 });
+    if (!rl.allowed) {
+      return Response.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 300) } }
+      );
+    }
+
     const { email, password } = await request.json();
 
     if (!email || !password) {

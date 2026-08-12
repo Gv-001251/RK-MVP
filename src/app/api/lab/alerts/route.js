@@ -1,9 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '@/lib/mysql/db';
-import { getAuthenticatedUser, writeAuditLog } from '@/lib/auth-middleware';
+import { requireAuth, writeAuditLog } from '@/lib/auth-middleware';
+import { ROLES } from '@/lib/auth-config';
 
 export async function GET(request) {
   try {
+    const { response } = await requireAuth(...ROLES.LAB_READ);
+    if (response) return response;
+
     const { searchParams } = new URL(request.url);
     const patientId    = searchParams.get('patientId');
     const acknowledged = searchParams.get('acknowledged');
@@ -28,7 +32,15 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const { response } = await requireAuth(...ROLES.LAB_STAFF);
+    if (response) return response;
+
     const body = await request.json();
+
+    if (!body.patientId || !body.testName || body.value === undefined || body.value === null || body.value === '') {
+      return Response.json({ error: 'patientId, testName and value are required' }, { status: 400 });
+    }
+
     const id = uuidv4();
 
     await query(
@@ -58,16 +70,15 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
-    const { user, profile } = await getAuthenticatedUser();
+    const { user, profile, response } = await requireAuth(...ROLES.ALERT_ACK);
+    if (response) return response;
+
     const body = await request.json();
     const { alertId, acknowledgedBy } = body;
 
-    const timestamp = new Date().toLocaleDateString('en-GB') + ' ' +
-                      new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
     await query(
       `UPDATE lab_alerts SET acknowledged = 1, acknowledged_by = ?, acknowledged_at = ? WHERE id = ?`,
-      [acknowledgedBy || profile?.full_name || 'Doctor', timestamp, alertId]
+      [acknowledgedBy || profile?.full_name || 'Doctor', new Date(), alertId]
     );
 
     const [data] = await query('SELECT * FROM lab_alerts WHERE id = ?', [alertId]);

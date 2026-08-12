@@ -310,47 +310,49 @@ export default function DoctorLaboratoryPanel() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
-              <thead>
-                <tr style={{ borderBottom: '2.5px solid var(--border-color)', backgroundColor: 'var(--bg-primary)' }}>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '750', color: 'var(--text-secondary)' }}>Biomarker / Test Analyte</th>
-                  {reportsData.map(r => (
-                    <th key={r.taskId} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '750', color: 'var(--text-secondary)' }}>
-                      Date: {r.date} <br />
-                      <small style={{ color: 'var(--text-muted)', fontSize: '9.5px', fontWeight: '400' }}>{r.taskId}</small>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {allParams.map((param, idx) => (
-                  <tr key={param} style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: '600', color: 'var(--text-primary)' }}>{param}</td>
-                    {reportsData.map(r => {
-                      const val = r.params[param] || 'Not Tested';
-                      const isHigh = /high/i.test(val);
-                      const isLow = /low/i.test(val);
-                      const isCritical = /critical/i.test(val) || /abnormal/i.test(val);
-
-                      let style = { padding: '10px 12px', textAlign: 'center', color: 'var(--text-secondary)' };
-                      if (isCritical) {
-                        style.color = 'var(--rose)';
-                        style.fontWeight = '800';
-                      } else if (isHigh || isLow) {
-                        style.color = 'var(--amber)';
-                        style.fontWeight = '700';
-                      }
-
-                      return (
-                        <td key={r.taskId} style={style}>
-                          {val}
-                        </td>
-                      );
-                    })}
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2.5px solid var(--border-color)', backgroundColor: 'var(--bg-primary)' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '750', color: 'var(--text-secondary)' }}>Biomarker / Test Analyte</th>
+                    {reportsData.map(r => (
+                      <th key={r.taskId} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '750', color: 'var(--text-secondary)' }}>
+                        Date: {r.date} <br />
+                        <small style={{ color: 'var(--text-muted)', fontSize: '9.5px', fontWeight: '400' }}>{r.taskId}</small>
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {allParams.map((param, idx) => (
+                    <tr key={param} style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: '600', color: 'var(--text-primary)' }}>{param}</td>
+                      {reportsData.map(r => {
+                        const val = r.params[param] || 'Not Tested';
+                        const isHigh = /high/i.test(val);
+                        const isLow = /low/i.test(val);
+                        const isCritical = /critical/i.test(val) || /abnormal/i.test(val);
+  
+                        let style = { padding: '10px 12px', textAlign: 'center', color: 'var(--text-secondary)' };
+                        if (isCritical) {
+                          style.color = 'var(--rose)';
+                          style.fontWeight = '800';
+                        } else if (isHigh || isLow) {
+                          style.color = 'var(--amber)';
+                          style.fontWeight = '700';
+                        }
+  
+                        return (
+                          <td key={r.taskId} style={style}>
+                            {val}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -943,42 +945,44 @@ export default function DoctorLaboratoryPanel() {
               </div>
 
               {/* Investigations table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '20px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #0f172a' }}>
-                    <th style={{ textAlign: 'left', padding: '8px', width: '30%' }}>Investigation Test</th>
-                    <th style={{ textAlign: 'left', padding: '8px', width: '45%' }}>Result Findings Value</th>
-                    <th style={{ textAlign: 'left', padding: '8px', width: '25%' }}>Biological Reference Limits</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {modalTask.orderedTests.map((test, index) => {
-                    const res = modalTask.testResults ? modalTask.testResults[test] : null;
-                    
-                    // Simple check for abnormals in this task
-                    const resultAlerts = getAbnormalResults(modalTask.clinicPatientId || modalTask.patientId);
-                    const alert = resultAlerts.find(a => a.testName.toLowerCase().includes(test.toLowerCase()) || test.toLowerCase().includes(a.testName.toLowerCase()));
-                    
-                    let rowVal = res ? res.val : 'Processing / Pending';
-                    let refVal = '--';
-                    if (res && res.val) {
-                      const refMatch = res.val.match(/\(Ref:\s*([^)]+)\)/);
-                      if (refMatch) refVal = refMatch[1];
-                      rowVal = res.val.split('(')[0].replace(new RegExp(test + '\\s*:\\s*', 'i'), '').trim();
-                    }
-
-                    return (
-                      <tr key={index} style={{ borderBottom: '1.5px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 8px', fontWeight: '750' }}>{test}</td>
-                        <td style={{ padding: '10px 8px', color: alert ? (alert.flag === 'Critical' ? 'var(--rose)' : 'var(--amber)') : 'inherit', fontWeight: alert ? '800' : 'normal' }}>
-                          {rowVal} {alert && `(${alert.flag.toUpperCase()})`}
-                        </td>
-                        <td style={{ padding: '10px 8px', color: '#64748b' }}>{refVal}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '20px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #0f172a' }}>
+                      <th style={{ textAlign: 'left', padding: '8px', width: '30%' }}>Investigation Test</th>
+                      <th style={{ textAlign: 'left', padding: '8px', width: '45%' }}>Result Findings Value</th>
+                      <th style={{ textAlign: 'left', padding: '8px', width: '25%' }}>Biological Reference Limits</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalTask.orderedTests.map((test, index) => {
+                      const res = modalTask.testResults ? modalTask.testResults[test] : null;
+                      
+                      // Simple check for abnormals in this task
+                      const resultAlerts = getAbnormalResults(modalTask.clinicPatientId || modalTask.patientId);
+                      const alert = resultAlerts.find(a => a.testName.toLowerCase().includes(test.toLowerCase()) || test.toLowerCase().includes(a.testName.toLowerCase()));
+                      
+                      let rowVal = res ? res.val : 'Processing / Pending';
+                      let refVal = '--';
+                      if (res && res.val) {
+                        const refMatch = res.val.match(/\(Ref:\s*([^)]+)\)/);
+                        if (refMatch) refVal = refMatch[1];
+                        rowVal = res.val.split('(')[0].replace(new RegExp(test + '\\s*:\\s*', 'i'), '').trim();
+                      }
+  
+                      return (
+                        <tr key={index} style={{ borderBottom: '1.5px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 8px', fontWeight: '750' }}>{test}</td>
+                          <td style={{ padding: '10px 8px', color: alert ? (alert.flag === 'Critical' ? 'var(--rose)' : 'var(--amber)') : 'inherit', fontWeight: alert ? '800' : 'normal' }}>
+                            {rowVal} {alert && `(${alert.flag.toUpperCase()})`}
+                          </td>
+                          <td style={{ padding: '10px 8px', color: '#64748b' }}>{refVal}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Signoff */}
               <div style={{ borderTop: '2.5px solid #0f172a', paddingTop: '12px', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '11px' }}>

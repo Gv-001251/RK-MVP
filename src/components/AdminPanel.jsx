@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useClinic } from '../context/ClinicContext';
+import CriticalValueSettings from './CriticalValueSettings';
+import DeltaCheckSettings from './DeltaCheckSettings';
 
 export default function AdminPanel() {
   const {
@@ -31,6 +33,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (activeTab === 'audit') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchAuditLogs();
     }
   }, [activeTab]);
@@ -111,6 +114,20 @@ export default function AdminPanel() {
           style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: '700' }}
         >
           📋 Security Audit Logs
+        </button>
+        <button 
+          onClick={() => setActiveTab('critical')}
+          className={`btn ${activeTab === 'critical' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: '700' }}
+        >
+          🚨 Critical Values
+        </button>
+        <button 
+          onClick={() => setActiveTab('delta')}
+          className={`btn ${activeTab === 'delta' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: '700' }}
+        >
+          📈 Delta Checks
         </button>
       </div>
 
@@ -285,7 +302,13 @@ export default function AdminPanel() {
         </div>
       </div>
     </>
-  ) : (
+  ) : activeTab === 'critical' ? (
+        /* CRITICAL VALUE SETTINGS */
+        <CriticalValueSettings />
+      ) : activeTab === 'delta' ? (
+        /* DELTA CHECK SETTINGS */
+        <DeltaCheckSettings />
+      ) : (
         /* AUDIT LOGS VIEW */
         <div className="panel-card col-12" style={{ padding: '0px', borderRadius: '16px', overflow: 'hidden' }}>
           <div className="panel-card-header" style={{ padding: '20px', borderBottom: '1px solid var(--border-color)' }}>
@@ -311,7 +334,7 @@ export default function AdminPanel() {
                 <tbody>
                   {auditLogs.map(log => (
                     <tr key={log.id}>
-                      <td style={{ color: 'var(--text-secondary)' }}>{new Date(log.created_at || Date.now()).toLocaleString()}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{log.created_at ? new Date(log.created_at).toLocaleString() : '—'}</td>
                       <td><strong>{log.user_name || 'System Operator'}</strong></td>
                       <td>
                         <span className={`badge ${

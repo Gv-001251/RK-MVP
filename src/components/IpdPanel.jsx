@@ -202,16 +202,8 @@ export default function IpdPanel() {
     }).format(val);
   };
 
-  // Combined Inpatients Builder (Seeded mock + dynamic context)
+  // Combined Inpatients Builder (dynamic context only)
   const getCombinedInpatients = () => {
-    const mockInpatients = [
-      { ipdNo: 'IPD-001', name: 'Ramesh Kumar', ageGender: '45 / Male', doctor: 'Dr. Anil Sharma', bed: '101 / B1', status: 'Stable', date: '19 May 2025', patientId: 'ON-MOCK-IP1' },
-      { ipdNo: 'IPD-002', name: 'Priya Singh', ageGender: '28 / Female', doctor: 'Dr. Neha Verma', bed: '102 / A2', status: 'Stable', date: '18 May 2025', patientId: 'ON-MOCK-IP2' },
-      { ipdNo: 'IPD-003', name: 'Suresh Patel', ageGender: '52 / Male', doctor: 'Dr. Rahul Mehta', bed: 'ICU-01', status: 'Critical', date: '17 May 2025', patientId: 'ON-MOCK-IP3' },
-      { ipdNo: 'IPD-004', name: 'Asha Rani', ageGender: '37 / Female', doctor: 'Dr. Pooja Singh', bed: '201 / B3', status: 'Improving', date: '16 May 2025', patientId: 'ON-MOCK-IP4' },
-      { ipdNo: 'IPD-005', name: 'Mohit Gupta', ageGender: '29 / Male', doctor: 'Dr. Vikram Patel', bed: '202 / A1', status: 'Stable', date: '16 May 2025', patientId: 'ON-MOCK-IP5' }
-    ];
-
     const contextInpatients = inpatients.map((ip, idx) => {
       const pat = patients.find(p => p.id === ip.patientId);
       return {
@@ -227,14 +219,7 @@ export default function IpdPanel() {
       };
     });
 
-    const merged = [...contextInpatients];
-    mockInpatients.forEach(item => {
-      if (!merged.some(m => m.name.toLowerCase() === item.name.toLowerCase())) {
-        merged.push(item);
-      }
-    });
-
-    return merged.slice(0, 5);
+    return contextInpatients.slice(0, 5);
   };
 
   // Dynamic Ward-wise Occupancy Calculations

@@ -1008,134 +1008,202 @@ export default function DoctorConsultationPanel({ onPrintPrescription, onNavigat
             </div>
             
             <div style={{ overflowX: 'auto' }}>
-              <table className="tablet-med-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '32%' }}>Medicine Name</th>
-                    <th style={{ width: '12%' }}>Strength</th>
-                    <th style={{ width: '12%' }}>Dosage</th>
-                    <th style={{ width: '12%' }}>Frequency</th>
-                    <th style={{ width: '12%' }}>Duration</th>
-                    <th style={{ width: '14%' }}>Before/After Food</th>
-                    <th style={{ width: '16%' }}>Notes</th>
-                    <th style={{ width: '40px' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prescMeds.map((med, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        <div style={{ position: 'relative' }}>
-                          <input 
-                            type="text"
-                            className="table-input"
-                            value={med.name}
-                            onChange={(e) => handleMedQueryChange(idx, e.target.value)}
-                            onFocus={() => {
-                              setActiveMedSearchIndex(idx);
-                              setMedQuery(med.name);
-                            }}
-                            onBlur={() => setTimeout(() => {
-                              if (activeMedSearchIndex === idx) {
-                                setActiveMedSearchIndex(null);
-                              }
-                            }, 250)}
-                            placeholder="Type to search..."
-                          />
-                          {activeMedSearchIndex === idx && medQuery && (
-                            <div className="table-autocomplete-dropdown">
-                              {filteredMeds.map(item => (
-                                <div 
-                                  key={item.id} 
-                                  className="table-autocomplete-item"
-                                  onMouseDown={() => handleSelectMedicine(idx, item)}
-                                >
-                                  <span><strong>{item.name}</strong> <small style={{ color: 'var(--text-muted)' }}>({item.category})</small></span>
-                                  <span style={{ fontSize: '10px', fontWeight: 'bold', color: item.stock > 10 ? 'var(--emerald)' : 'var(--rose)' }}>
-                                    {item.stock} in stock
-                                  </span>
-                                </div>
-                              ))}
-                              {filteredMeds.length === 0 && (
-                                <div className="table-autocomplete-item" style={{ color: 'var(--text-muted)', cursor: 'default' }}>
-                                  No matches found
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <input 
-                          type="text" 
-                          className="table-input" 
-                          value={med.strength} 
-                          onChange={(e) => handleUpdateMedCell(idx, 'strength', e.target.value)}
-                          placeholder="e.g. 650mg"
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="text" 
-                          className="table-input" 
-                          value={med.dose} 
-                          onChange={(e) => handleUpdateMedCell(idx, 'dose', e.target.value)}
-                          placeholder="e.g. 1 Tablet"
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="text" 
-                          className="table-input" 
-                          value={med.frequency} 
-                          onChange={(e) => handleUpdateMedCell(idx, 'frequency', e.target.value)}
-                          placeholder="e.g. 1-0-1"
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="text" 
-                          className="table-input" 
-                          value={med.duration} 
-                          onChange={(e) => handleUpdateMedCell(idx, 'duration', e.target.value)}
-                          placeholder="e.g. 5 Days"
-                        />
-                      </td>
-                      <td>
-                        <select 
-                          className="table-input" 
-                          value={med.instructions}
-                          onChange={(e) => handleUpdateMedCell(idx, 'instructions', e.target.value)}
-                          style={{ padding: '8px' }}
-                        >
-                          <option value="After Food">After Food</option>
-                          <option value="Before Food">Before Food</option>
-                          <option value="With Food">With Food</option>
-                          <option value="Empty Stomach">Empty Stomach</option>
-                        </select>
-                      </td>
-                      <td>
-                        <input 
-                          type="text" 
-                          className="table-input" 
-                          value={med.notes} 
-                          onChange={(e) => handleUpdateMedCell(idx, 'notes', e.target.value)}
-                          placeholder="e.g. PRN"
-                        />
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button 
-                          type="button" 
-                          onClick={() => handleDeleteMedRow(idx)}
-                          style={{ border: 'none', background: 'none', color: 'var(--rose)', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
-                        >
-                          ×
-                        </button>
-                      </td>
+              <div className="table-responsive">
+                <table className="tablet-med-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '32%' }}>Medicine Name</th>
+                      <th style={{ width: '12%' }}>Strength</th>
+                      <th style={{ width: '12%' }}>Dosage</th>
+                      <th style={{ width: '12%' }}>Frequency</th>
+                      <th style={{ width: '12%' }}>Duration</th>
+                      <th style={{ width: '14%' }}>Before/After Food</th>
+                      <th style={{ width: '16%' }}>Notes</th>
+                      <th style={{ width: '40px' }}></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {prescMeds.map((med, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <div style={{ position: 'relative' }}>
+                            <input 
+                              type="text"
+                              className="table-input"
+                              value={med.name}
+                              onChange={(e) => handleMedQueryChange(idx, e.target.value)}
+                              onFocus={() => {
+                                setActiveMedSearchIndex(idx);
+                                setMedQuery(med.name);
+                              }}
+                              onBlur={() => setTimeout(() => {
+                                if (activeMedSearchIndex === idx) {
+                                  setActiveMedSearchIndex(null);
+                                }
+                              }, 250)}
+                              placeholder="Type to search..."
+                            />
+                            {activeMedSearchIndex === idx && medQuery && (
+                              <div className="table-autocomplete-dropdown">
+                                {filteredMeds.map(item => (
+                                  <div 
+                                    key={item.id} 
+                                    className="table-autocomplete-item"
+                                    onMouseDown={() => handleSelectMedicine(idx, item)}
+                                  >
+                                    <span><strong>{item.name}</strong> <small style={{ color: 'var(--text-muted)' }}>({item.category})</small></span>
+                                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: item.stock > 10 ? 'var(--emerald)' : 'var(--rose)' }}>
+                                      {item.stock} in stock
+                                    </span>
+                                  </div>
+                                ))}
+                                {filteredMeds.length === 0 && (
+                                  <div className="table-autocomplete-item" style={{ color: 'var(--text-muted)', cursor: 'default' }}>
+                                    No matches found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            className="table-input" 
+                            value={med.strength} 
+                            onChange={(e) => handleUpdateMedCell(idx, 'strength', e.target.value)}
+                            placeholder="e.g. 650mg"
+                            list="strength-suggestions"
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            className="table-input" 
+                            value={med.dose} 
+                            onChange={(e) => handleUpdateMedCell(idx, 'dose', e.target.value)}
+                            placeholder="e.g. 1 Tablet"
+                            list="dosage-suggestions"
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            className="table-input" 
+                            value={med.frequency} 
+                            onChange={(e) => handleUpdateMedCell(idx, 'frequency', e.target.value)}
+                            placeholder="e.g. 1-0-1"
+                            list="frequency-suggestions"
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            className="table-input" 
+                            value={med.duration} 
+                            onChange={(e) => handleUpdateMedCell(idx, 'duration', e.target.value)}
+                            placeholder="e.g. 5 Days"
+                            list="duration-suggestions"
+                          />
+                        </td>
+                        <td>
+                          <select 
+                            className="table-input" 
+                            value={med.instructions}
+                            onChange={(e) => handleUpdateMedCell(idx, 'instructions', e.target.value)}
+                            style={{ padding: '8px' }}
+                          >
+                            <option value="After Food">After Food</option>
+                            <option value="Before Food">Before Food</option>
+                            <option value="With Food">With Food</option>
+                            <option value="Empty Stomach">Empty Stomach</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            className="table-input" 
+                            value={med.notes} 
+                            onChange={(e) => handleUpdateMedCell(idx, 'notes', e.target.value)}
+                            placeholder="e.g. PRN"
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => handleDeleteMedRow(idx)}
+                            style={{ border: 'none', background: 'none', color: 'var(--rose)', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Native suggestions for easier entry */}
+              <datalist id="strength-suggestions">
+                <option value="500mg" />
+                <option value="650mg" />
+                <option value="250mg" />
+                <option value="150mg" />
+                <option value="100mg" />
+                <option value="50mg" />
+                <option value="25mg" />
+                <option value="10mg" />
+                <option value="5mg" />
+                <option value="2.5mg" />
+                <option value="5ml" />
+                <option value="10ml" />
+              </datalist>
+
+              <datalist id="dosage-suggestions">
+                <option value="1 Tablet" />
+                <option value="2 Tablets" />
+                <option value="1/2 Tablet" />
+                <option value="1 Capsule" />
+                <option value="2 Capsules" />
+                <option value="1 Teaspoon" />
+                <option value="2 Teaspoons" />
+                <option value="5ml" />
+                <option value="10ml" />
+                <option value="1 Puff" />
+                <option value="2 Puffs" />
+                <option value="Apply Externally" />
+              </datalist>
+
+              <datalist id="frequency-suggestions">
+                <option value="1-0-1" />
+                <option value="1-1-1" />
+                <option value="1-0-0" />
+                <option value="0-0-1" />
+                <option value="0-1-0" />
+                <option value="1-1-1-1" />
+                <option value="PRN (As Needed)" />
+                <option value="Once Daily" />
+                <option value="Twice Daily" />
+                <option value="Thrice Daily" />
+                <option value="Every 4 hours" />
+                <option value="Every 6 hours" />
+                <option value="Every 8 hours" />
+                <option value="Stat (Immediately)" />
+              </datalist>
+
+              <datalist id="duration-suggestions">
+                <option value="1 Day" />
+                <option value="2 Days" />
+                <option value="3 Days" />
+                <option value="5 Days" />
+                <option value="7 Days" />
+                <option value="10 Days" />
+                <option value="14 Days" />
+                <option value="30 Days" />
+                <option value="1 Month" />
+                <option value="2 Months" />
+                <option value="3 Months" />
+              </datalist>
             </div>
           </div>
 
@@ -1726,32 +1794,34 @@ export default function DoctorConsultationPanel({ onPrintPrescription, onNavigat
                     </div>
 
                     {/* Test Results Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '20px' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold' }}>
-                          <th style={{ padding: '8px', textAlign: 'left' }}>Investigation / Biomarker</th>
-                          <th style={{ padding: '8px', textAlign: 'left' }}>Observed Result</th>
-                          <th style={{ padding: '8px', textAlign: 'left' }}>Analyzer Source</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {order.orderedTests.map(testName => {
-                          const res = task?.testResults?.[testName];
-                          const hasAbnormal = res?.val && (res.val.includes('High') || res.val.includes('Low') || res.val.includes('Diabetic') || res.val.includes('Elevated'));
-                          return (
-                            <tr key={testName} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                              <td style={{ padding: '8px' }}><strong>{testName}</strong></td>
-                              <td style={{ padding: '8px', color: hasAbnormal ? '#e11d48' : '#0f172a', fontWeight: hasAbnormal ? '700' : 'normal', whiteSpace: 'pre-line' }}>
-                                {res ? res.val : <span style={{ color: '#64748b', fontStyle: 'italic' }}>Pending result...</span>}
-                              </td>
-                              <td style={{ padding: '8px', fontSize: '10px', color: '#475569' }}>
-                                {res ? res.machine : 'Analyzer Port (Auto)'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    <div className="table-responsive">
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '20px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold' }}>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>Investigation / Biomarker</th>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>Observed Result</th>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>Analyzer Source</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {order.orderedTests.map(testName => {
+                            const res = task?.testResults?.[testName];
+                            const hasAbnormal = res?.val && (res.val.includes('High') || res.val.includes('Low') || res.val.includes('Diabetic') || res.val.includes('Elevated'));
+                            return (
+                              <tr key={testName} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                <td style={{ padding: '8px' }}><strong>{testName}</strong></td>
+                                <td style={{ padding: '8px', color: hasAbnormal ? '#e11d48' : '#0f172a', fontWeight: hasAbnormal ? '700' : 'normal', whiteSpace: 'pre-line' }}>
+                                  {res ? res.val : <span style={{ color: '#64748b', fontStyle: 'italic' }}>Pending result...</span>}
+                                </td>
+                                <td style={{ padding: '8px', fontSize: '10px', color: '#475569' }}>
+                                  {res ? res.machine : 'Analyzer Port (Auto)'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
 
                     {/* Pathologist QC Certification */}
                     <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '16px' }}>

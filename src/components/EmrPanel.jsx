@@ -400,24 +400,26 @@ export default function EmrPanel({ initialSelectedPatientId }) {
 
                       <div>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Prescribed Medications</span>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '6px', fontSize: '12.5px' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px dashed var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                              <th style={{ padding: '4px' }}>Medicine</th>
-                              <th style={{ padding: '4px' }}>Instructions</th>
-                              <th style={{ padding: '4px' }}>Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rx.meds.map((med, medIdx) => (
-                              <tr key={medIdx} style={{ borderBottom: '1px dashed var(--border-color)' }}>
-                                <td style={{ padding: '6px 4px' }}><strong>{med.name}</strong></td>
-                                <td style={{ padding: '6px 4px' }}>{med.dose}</td>
-                                <td style={{ padding: '6px 4px' }}>{med.duration}</td>
+                        <div className="table-responsive">
+                          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '6px', fontSize: '12.5px' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px dashed var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                                <th style={{ padding: '4px' }}>Medicine</th>
+                                <th style={{ padding: '4px' }}>Instructions</th>
+                                <th style={{ padding: '4px' }}>Duration</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {rx.meds.map((med, medIdx) => (
+                                <tr key={medIdx} style={{ borderBottom: '1px dashed var(--border-color)' }}>
+                                  <td style={{ padding: '6px 4px' }}><strong>{med.name}</strong></td>
+                                  <td style={{ padding: '6px 4px' }}>{med.dose}</td>
+                                  <td style={{ padding: '6px 4px' }}>{med.duration}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   ))

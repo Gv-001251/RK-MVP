@@ -49,27 +49,19 @@ export default function ReportsPanel() {
     });
   });
 
-  // Fallback seed data if no prescriptions written yet
-  const defaultTopMeds = [
-    { name: 'Metoprolol 50mg', count: 124, color: 'var(--primary)' },
-    { name: 'Amlodipine 5mg', count: 98, color: '#3b82f6' },
-    { name: 'Amoxicillin 500mg', count: 86, color: '#ec4899' },
-    { name: 'Atorvastatin 20mg', count: 64, color: '#f59e0b' },
-    { name: 'Albuterol Inhaler', count: 42, color: '#ef4444' }
-  ];
+  const topMedicines = Object.keys(medCounts)
+    .map((name, idx) => {
+      const colors = ['var(--primary)', '#3b82f6', '#ec4899', '#f59e0b', '#ef4444'];
+      return {
+        name,
+        count: medCounts[name],
+        color: colors[idx % colors.length]
+      };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
-  const topMedicines = Object.keys(medCounts).length > 0
-    ? Object.keys(medCounts).map((name, idx) => {
-        const colors = ['var(--primary)', '#3b82f6', '#ec4899', '#f59e0b', '#ef4444'];
-        return {
-          name,
-          count: medCounts[name],
-          color: colors[idx % colors.length]
-        };
-      }).sort((a, b) => b.count - a.count).slice(0, 5)
-    : defaultTopMeds;
-
-  // Export mock raw data
+  // Export raw data
   const handleExportData = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += "Invoice ID,Date,Patient ID,Amount,Payment Mode,Status\n";
@@ -83,7 +75,7 @@ export default function ReportsPanel() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    alert("Mock CSV Report exported successfully.");
+    alert("CSV report exported successfully.");
   };
 
   const downloadReportsPDF = () => {

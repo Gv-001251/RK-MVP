@@ -52,10 +52,13 @@ export async function POST(request) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Waiting', 'Awaiting Examination', 'OPD', 'Active')`,
       [
         patientId,
-        body.name,
+        // mysql2 refuses `undefined` as a bound parameter, so every optional
+        // field is coerced to null. Without this, a caller that simply omits
+        // `phone` or `gender` gets a 500 instead of a stored NULL.
+        body.name ?? null,
         parseInt(body.age) || null,
-        body.gender,
-        body.phone,
+        body.gender ?? null,
+        body.phone ?? null,
         body.email || null,
         body.blood || body.blood_group || 'O+',
         body.allergies || 'None',

@@ -18,6 +18,9 @@ export default function BillingPanel() {
   // Modal / overlays state
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
+  const [payInvoice, setPayInvoice] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMode, setPayMode] = useState('Cash');
 
   // Invoice form state
   const [formPatientId, setFormPatientId] = useState(patients[0]?.id || '');
@@ -38,12 +41,31 @@ export default function BillingPanel() {
     return matchesSearch && matchesStatus;
   });
 
-  const handlePayClick = (invId) => {
-    const paymentMode = prompt("Enter Payment Mode (Cash, Card, UPI, Insurance):", "Cash");
-    if (paymentMode) {
-      recordPayment(invId, paymentMode);
-      alert(`Invoice ${invId} marked as Paid via ${paymentMode}.`);
+  const handlePayClick = (inv) => {
+    setPayInvoice(inv);
+    const balance = inv.balance !== undefined ? inv.balance : (inv.status === 'Paid' ? 0 : inv.amount);
+    setPayAmount(balance.toString());
+    setPayMode(inv.mode || 'Cash');
+  };
+
+  const handlePaymentSubmit = (e) => {
+    e.preventDefault();
+    if (!payInvoice) return;
+    const amt = parseFloat(payAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Please enter a valid payment amount.");
+      return;
     }
+    const balance = payInvoice.balance !== undefined ? payInvoice.balance : (payInvoice.status === 'Paid' ? 0 : payInvoice.amount);
+    if (amt > balance) {
+      alert(`Payment amount cannot exceed remaining balance of ${currency}${balance}.`);
+      return;
+    }
+    
+    recordPayment(payInvoice.id, payMode, amt);
+    alert(`Success: Recorded payment of ${currency}${amt} via ${payMode} for Invoice ${payInvoice.id}.`);
+    setPayInvoice(null);
+    setPayAmount('');
   };
 
   const handleAddItem = () => {
@@ -131,7 +153,8 @@ export default function BillingPanel() {
                   <th>Date</th>
                   <th>Patient ID</th>
                   <th>Patient Name</th>
-                  <th>Amount</th>
+                  <th>Total Amount</th>
+                  <th>Balance Due</th>
                   <th>Payment Mode</th>
                   <th>Payment Status</th>
                   <th style={{ textAlign: 'right' }}>Action</th>
@@ -141,13 +164,24 @@ export default function BillingPanel() {
                 {filteredInvoices.length > 0 ? (
                   filteredInvoices.map(inv => {
                     const pat = patients.find(p => p.id === inv.patientId);
+                    const balance = inv.balance !== undefined ? inv.balance : (inv.status === 'Paid' ? 0 : inv.amount);
                     return (
                       <tr key={inv.id} onClick={() => setSelectedInvoice(inv)}>
-                        <td><strong style={{ color: 'var(--primary)' }}>{inv.id}</strong></td>
+                        <td>
+                          <strong style={{ color: 'var(--primary)' }}>{inv.id}</strong>
+                          {inv.labOrderNumber && (
+                            <div style={{ fontSize: '10px', color: 'var(--indigo)', marginTop: '2px', fontWeight: 'bold' }}>
+                              🔬 Lab: {inv.labOrderNumber}
+                            </div>
+                          )}
+                        </td>
                         <td>{inv.date}</td>
                         <td><code>{inv.patientId}</code></td>
                         <td>{pat ? pat.name : 'Unknown'}</td>
                         <td><strong>{currency}{inv.amount.toFixed(2)}</strong></td>
+                        <td style={{ color: balance > 0 ? 'var(--rose)' : 'var(--emerald)', fontWeight: 'bold' }}>
+                          {currency}{balance.toFixed(2)}
+                        </td>
                         <td>{inv.mode}</td>
                         <td>
                           <span className={`badge ${
@@ -171,10 +205,10 @@ export default function BillingPanel() {
                             >
                               Receipt
                             </button>
-                            {inv.status === 'Pending' && (
+                            {balance > 0 && (
                               <button
                                 className="btn btn-emerald btn-sm"
-                                onClick={() => handlePayClick(inv.id)}
+                                onClick={() => handlePayClick(inv)}
                                 style={{ padding: '4px 8px', fontSize: '11px' }}
                               >
                                 Record Pay
@@ -295,32 +329,34 @@ export default function BillingPanel() {
 
                   {/* List of items */}
                   {formItems.length > 0 ? (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                          <th style={{ padding: '4px' }}>Description</th>
-                          <th style={{ padding: '4px', textAlign: 'right' }}>Price</th>
-                          <th style={{ padding: '4px', textAlign: 'right' }}>Remove</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {formItems.map((item, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px dashed var(--border-color)' }}>
-                            <td style={{ padding: '6px 4px' }}>{item.desc}</td>
-                            <td style={{ padding: '6px 4px', textAlign: 'right' }}>{currency}{item.price.toFixed(2)}</td>
-                            <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                              <button 
-                                type="button" 
-                                onClick={() => handleRemoveItem(idx)}
-                                style={{ background: 'none', border: 'none', color: 'var(--rose)', cursor: 'pointer', fontWeight: 'bold' }}
-                              >
-                                ×
-                              </button>
-                            </td>
+                    <div className="table-responsive">
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                            <th style={{ padding: '4px' }}>Description</th>
+                            <th style={{ padding: '4px', textAlign: 'right' }}>Price</th>
+                            <th style={{ padding: '4px', textAlign: 'right' }}>Remove</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {formItems.map((item, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px dashed var(--border-color)' }}>
+                              <td style={{ padding: '6px 4px' }}>{item.desc}</td>
+                              <td style={{ padding: '6px 4px', textAlign: 'right' }}>{currency}{item.price.toFixed(2)}</td>
+                              <td style={{ padding: '6px 4px', textAlign: 'right' }}>
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleRemoveItem(idx)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--rose)', cursor: 'pointer', fontWeight: 'bold' }}
+                                >
+                                  ×
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-muted)', fontSize: '11.5px' }}>
                       No items added yet. Build the bill items above.
@@ -385,22 +421,24 @@ export default function BillingPanel() {
                 );
               })()}
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--text-muted)', textAlign: 'left', fontSize: '12px' }}>
-                    <th style={{ padding: '4px 0' }}>Item Charge Description</th>
-                    <th style={{ padding: '4px 0', textAlign: 'right' }}>Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedInvoice.items?.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1.5px dashed var(--border-color)' }}>
-                      <td style={{ padding: '6px 0' }}>{item.desc}</td>
-                      <td style={{ padding: '6px 0', textAlign: 'right' }}>{currency}{item.price.toFixed(2)}</td>
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--text-muted)', textAlign: 'left', fontSize: '12px' }}>
+                      <th style={{ padding: '4px 0' }}>Item Charge Description</th>
+                      <th style={{ padding: '4px 0', textAlign: 'right' }}>Price</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {selectedInvoice.items?.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1.5px dashed var(--border-color)' }}>
+                        <td style={{ padding: '6px 0' }}>{item.desc}</td>
+                        <td style={{ padding: '6px 0', textAlign: 'right' }}>{currency}{item.price.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', borderTop: '1px solid var(--text-primary)', paddingTop: '8px' }}>
                 <span>Grand Total Amount:</span>
@@ -418,8 +456,105 @@ export default function BillingPanel() {
               >
                 📥 PDF Download
               </button>
-              <button className="btn btn-primary" onClick={() => { window.print(); }}>🖨️ Mock Print</button>
+              <button className="btn btn-primary" onClick={() => { window.print(); }}>🖨️ Print</button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* RECORD PAYMENT OVERLAY MODAL */}
+      {payInvoice && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="panel-card" style={{ width: '420px', backgroundColor: 'var(--bg-surface)', padding: '24px', borderRadius: '12px' }}>
+            <div className="modal-header" style={{ paddingBottom: '12px', borderBottom: '1px solid var(--border-color)', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', margin: 0 }}>💰 Record Payment Transaction</h3>
+              <button 
+                onClick={() => setPayInvoice(null)} 
+                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handlePaymentSubmit}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontWeight: '750', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Invoice Details</label>
+                  <div style={{ padding: '10px', backgroundColor: 'var(--bg-primary)', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--border-color)' }}>
+                    <strong>ID:</strong> {payInvoice.id}<br />
+                    <strong>Total Amount:</strong> {currency}{payInvoice.amount.toFixed(2)}<br />
+                    <strong>Remaining Balance:</strong> {currency}{(payInvoice.balance !== undefined ? payInvoice.balance : (payInvoice.status === 'Paid' ? 0 : payInvoice.amount)).toFixed(2)}
+                    {payInvoice.labOrderNumber && (
+                      <div style={{ marginTop: '4px', fontWeight: 'bold', color: 'var(--indigo)' }}>
+                        🔬 Linked Lab Order: {payInvoice.labOrderNumber}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontWeight: '750', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Payment Mode</label>
+                  <select
+                    className="form-control"
+                    value={payMode}
+                    onChange={(e) => setPayMode(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Insurance">Insurance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontWeight: '750', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Amount to Record ({currency})</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={(payInvoice.balance !== undefined ? payInvoice.balance : (payInvoice.status === 'Paid' ? 0 : payInvoice.amount))}
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    className="form-control"
+                    required
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        const bal = payInvoice.balance !== undefined ? payInvoice.balance : (payInvoice.status === 'Paid' ? 0 : payInvoice.amount);
+                        setPayAmount(bal.toString());
+                      }}
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      Fill Full Balance
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        const bal = payInvoice.balance !== undefined ? payInvoice.balance : (payInvoice.status === 'Paid' ? 0 : payInvoice.amount);
+                        setPayAmount((bal / 2).toFixed(2).toString());
+                      }}
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      Fill 50%
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1, height: '36px', fontSize: '12px', fontWeight: 'bold' }}>
+                    Record Payment
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setPayInvoice(null)} style={{ flex: 1, height: '36px', fontSize: '12px' }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

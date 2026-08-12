@@ -20,392 +20,167 @@ export function ClinicProvider({ children }) {
   const [darkMode, setDarkMode] = useState(false);
 
   // Initial Seed Data
-  const [patients, setPatients] = useState([
-    {
-      id: 'PAT-000001',
-      name: 'Al Amin',
-      age: 32,
-      gender: 'Male',
-      phone: '9440183421',
-      email: 'al.amin@mail.com',
-      blood: 'O-',
-      allergies: 'None',
-      address: 'Riyadh',
-      emergencyContact: 'Ahmad Amin (+966-501234567)',
-      visitStatus: 'Waiting',
-      lastConsultation: 'Routine Dental scaling',
-      dob: '02/12/1990',
-      createdDate: '10/08/2023',
-      visitTime: '10:00 AM',
-      type: 'UPNC',
-      status: 'Pending'
-    },
-    {
-      id: 'PAT-000002',
-      name: 'Faraj Bin Ahmad',
-      age: 23,
-      gender: 'Male',
-      phone: '8220019234',
-      email: 'faraj.b@mail.com',
-      blood: 'A+',
-      allergies: 'None',
-      address: 'Jeddah',
-      emergencyContact: 'Ahmad Bin Faraj (+966-502345678)',
-      visitStatus: 'In-Consultation',
-      lastConsultation: 'Cardiology Checkup',
-      dob: '10/08/2000',
-      createdDate: '26/07/2023',
-      visitTime: '08:20 PM',
-      type: 'FNXX',
-      status: 'Confirmed'
-    },
-    {
-      id: 'PAT-000003',
-      name: 'Fayruz Husniya',
-      age: 42,
-      gender: 'Female',
-      phone: '7200177890',
-      email: 'fayruz@mail.com',
-      blood: 'AB+',
-      allergies: 'None',
-      address: 'Dammam',
-      emergencyContact: 'Husniya Jameel (+966-503456789)',
-      visitStatus: 'Completed',
-      lastConsultation: 'Cardiovascular Stress Test',
-      dob: '11/11/1980',
-      createdDate: '13/07/2023',
-      visitTime: '07:11 AM',
-      type: 'FPA+CCN',
-      status: 'Confirmed'
-    },
-    {
-      id: 'PAT-000004',
-      name: 'Muammar Ghazzawi',
-      age: 20,
-      gender: 'Male',
-      phone: '9000156723',
-      email: 'muammar@mail.com',
-      blood: 'O+',
-      allergies: 'Sulfa Drugs',
-      address: 'Makkah',
-      emergencyContact: 'Ghazzawi Ali (+966-504567890)',
-      visitStatus: 'Waiting',
-      lastConsultation: 'Minor Chest Bruising',
-      dob: '07/04/2003',
-      createdDate: '01/07/2023',
-      visitTime: '05:13 PM',
-      type: 'AUN',
-      status: 'Pending'
-    },
-    {
-      id: 'PAT-000005',
-      name: 'Aaliyah Bin Salih',
-      age: 20,
-      gender: 'Female',
-      phone: '9840123456',
-      email: 'aaliyah@mail.com',
-      blood: 'AB-',
-      allergies: 'None',
-      address: 'Medina',
-      emergencyContact: 'Salih Bin Yusuf (+966-505678901)',
-      visitStatus: 'Scheduled',
-      lastConsultation: 'Annual General Vitals',
-      dob: '28/07/2020',
-      createdDate: '10/06/2023',
-      visitTime: '10:45 AM',
-      type: 'DCP',
-      status: 'Confirmed'
-    }
-  ]);
+  const [patients, setPatients] = useState([]);
 
-  const [queue, setQueue] = useState([
-    { token: '101', patientId: 'PAT-000002', doctor: 'Dr. Abdul Kareem', specialty: 'Cardiology', status: 'In-Consultation', checkin: '09:15 AM' },
-    { token: '102', patientId: 'PAT-000001', doctor: 'Dr. Abdul Kareem', specialty: 'Cardiology', status: 'Waiting', checkin: '09:30 AM' },
-    { token: '103', patientId: 'PAT-000004', doctor: 'Dr. Abdul Kareem', specialty: 'Cardiology', status: 'Waiting', checkin: '10:00 AM' }
-  ]);
+  const [queue, setQueue] = useState([]);
 
-  const [inpatients, setInpatients] = useState([
-    { bed: 'Ward A - Bed 3', patientId: 'PAT-000001', diagnosis: 'Acute Myocardial Infarction', date: '2026-06-02', doctor: 'Dr. Abdul Kareem', vitals: 'Pulse: 72, BP: 125/82', billing: 'Pending' },
-    { bed: 'ICU - Bed 1', patientId: 'PAT-000002', diagnosis: 'Severe Cardiac Arrhythmia', date: '2026-06-03', doctor: 'Dr. Abdul Kareem', vitals: 'Pulse: 98, BP: 140/90', billing: 'Covered (Insurance)' }
-  ]);
+  const [inpatients, setInpatients] = useState([]);
 
-  const [nursingNotes, setNursingNotes] = useState([
-    { time: '10 mins ago', author: 'Nurse Emily Smith, RN', priority: 'Critical', patientId: 'PAT-000001', text: 'Administered 50mg Metoprolol. Patient pulse stabilized at 72bpm. Monitoring BP every 15 mins.' },
-    { time: '1 hour ago', author: 'Nurse Jessica Taylor', priority: 'Routine', patientId: 'PAT-000002', text: 'Normal ECG run. Inpatient resting comfortably. Oxygen levels stable at 98% on room air.' }
-  ]);
+  const [nursingNotes, setNursingNotes] = useState([]);
 
-  const [inventory, setInventory] = useState([
-    { id: 1, name: 'Metoprolol 50mg', category: 'Beta-blocker', stock: 12, threshold: 30, price: 1.20, expiry: '2027-08-30', batchNumber: 'B-MET908' },
-    { id: 2, name: 'Amlodipine 5mg', category: 'Beta-blocker', stock: 120, threshold: 25, price: 0.85, expiry: '2026-12-15', batchNumber: 'B-AML231' },
-    { id: 3, name: 'Amoxicillin 500mg', category: 'Antibiotic', stock: 24, threshold: 40, price: 2.10, expiry: '2027-04-18', batchNumber: 'B-AMX402' },
-    { id: 4, name: 'Atorvastatin 20mg', category: 'Anticoagulant', stock: 350, threshold: 50, price: 1.50, expiry: '2028-02-22', batchNumber: 'B-ATO112' },
-    { id: 5, name: 'Albuterol Inhaler', category: 'Inhaler', stock: 8, threshold: 10, price: 22.00, expiry: '2027-11-05', batchNumber: 'B-ALB984' },
-    { id: 6, name: 'Paracetamol 650mg', category: 'Analgesic', stock: 150, threshold: 30, price: 15.00, expiry: '2027-09-30', batchNumber: 'B-PAR701' },
-    { id: 7, name: 'Metformin 500mg', category: 'Antidiabetic', stock: 200, threshold: 40, price: 18.00, expiry: '2028-01-15', batchNumber: 'B-MET500' },
-    { id: 8, name: 'Pantoprazole 40mg', category: 'Antacid', stock: 80, threshold: 20, price: 45.00, expiry: '2027-11-20', batchNumber: 'B-PAN040' },
-    { id: 9, name: 'Insulin Glargine', category: 'Hormone', stock: 25, threshold: 5, price: 420.00, expiry: '2026-12-05', batchNumber: 'B-INS100' },
-    { id: 10, name: 'Cetirizine 10mg', category: 'Antihistamine', stock: 120, threshold: 25, price: 14.00, expiry: '2027-06-30', batchNumber: 'B-CET010' }
-  ]);
+  const [inventory, setInventory] = useState([]);
 
-  const [prescriptions, setPrescriptions] = useState([
-    {
-      id: 'RK-RX-701',
-      date: '2026-06-04',
-      patientId: 'PAT-000003',
-      diagnosis: 'Hypertensive Heart Disease',
-      meds: [
-        { name: 'Amlodipine 5mg', dose: '1-0-0 (after breakfast)', duration: '30 Days' },
-        { name: 'Atorvastatin 20mg', dose: '0-0-1 (before bed)', duration: '30 Days' }
-      ],
-      symptoms: 'Mild chest heaviness, elevated BP 145/95 during last physical.',
-      status: 'Fulfilled'
-    }
-  ]);
+  const [prescriptions, setPrescriptions] = useState([]);
 
-  const [invoices, setInvoices] = useState([
-    { id: 'RK-INV-2026-01', date: '2026-06-04', patientId: 'PAT-000003', amount: 350.00, mode: 'Card', status: 'Paid', items: [{ desc: 'Cardiovascular Stress Test', price: 250 }, { desc: 'Specialist Consultation', price: 100 }] },
-    { id: 'RK-INV-2026-02', date: '2026-06-04', patientId: 'PAT-000001', amount: 1500.00, mode: 'Insurance', status: 'Pending', items: [{ desc: 'Emergency Ward Admission Fee', price: 1000 }, { desc: 'ECG + Cardiac Diagnostics', price: 500 }] },
-    { id: 'RK-INV-2026-03', date: '2026-06-04', patientId: 'PAT-000002', amount: 480.00, mode: 'Cash', status: 'Paid', items: [{ desc: 'Consultation Fee', price: 150 }, { desc: 'ECG Diagnostics', price: 250 }, { desc: 'Pharmacy Dispense', price: 80 }] }
-  ]);
+  const [invoices, setInvoices] = useState([]);
 
-  const [appointments, setAppointments] = useState([
-    { date: '2026-06-04', time: '04:30 PM', patientId: 'PAT-000001', doctor: 'Abdul Kareem', status: 'Scheduled', type: 'procedure', title: 'Dental scaling and polishing', hospital: 'Al-Sheikh Bin Jalal Dental Hospital' },
-    { date: '2026-06-08', time: '10:00 AM', patientId: 'PAT-000002', doctor: 'Abdul Kareem', status: 'Scheduled', type: 'appointment', title: 'Cardiology Checkup', hospital: 'RK Specialty Clinic' },
-    { date: '2026-06-15', time: '02:00 PM', patientId: 'PAT-000003', doctor: 'Abdul Kareem', status: 'Scheduled', type: 'meeting', title: 'Clinical Review Session', hospital: 'RK Specialty Clinic' },
-    { date: '2026-06-23', time: '11:00 AM', patientId: 'PAT-000004', doctor: 'Abdul Kareem', status: 'Scheduled', type: 'procedure', title: 'Minor Surgery Follow-up', hospital: 'Al-Sheikh Bin Jalal Dental Hospital' }
-  ]);
+  const [appointments, setAppointments] = useState([]);
 
-  const [users, setUsers] = useState([
-    { username: 'admin@rkclinic.com', fullName: 'Administrator', role: 'admin', email: 'admin@rkclinic.com', cabin: 'Administration Block' },
-    { username: 'doc@rkclinic.com', fullName: 'Doctor (MD)', role: 'doctor', email: 'doc@rkclinic.com', cabin: 'Cabin A - First Floor' },
-    { username: 'medic@rkclinic.com', fullName: 'Nurse & Pharmacy', role: 'nurse_pharmacy', email: 'medic@rkclinic.com', cabin: 'Nursing Station & Pharmacy' },
-    { username: 'lab@rkclinic.com', fullName: 'Laboratory Technician', role: 'technician', email: 'lab@rkclinic.com', cabin: 'Pathology Lab' }
-  ]);
+  const [users, setUsers] = useState([]);
 
-  const [backups, setBackups] = useState([
-    { filename: 'rk_clinic_backup_20260601.sql', date: '2026-06-01 10:00 AM', size: '2.4 MB', type: 'Scheduled' },
-    { filename: 'rk_clinic_backup_20260603.sql', date: '2026-06-03 11:30 PM', size: '2.5 MB', type: 'Manual' }
-  ]);
+  const [backups, setBackups] = useState([]);
 
   const [activeRole, setActiveRole] = useState('admin'); // Default role for prototype simulation
   const [user, setUser] = useState(null);
 
+  // New LIS System States
+  const [partners, setPartners] = useState([]);
+
+  const [editAudits, setEditAudits] = useState([]);
+
+  const [labTestsMaster, setLabTestsMaster] = useState([
+    { 
+      testName: 'CBC', 
+      b2cPrice: 350.00, 
+      b2bPrice: 200.00, 
+      department: 'Hematology', 
+      machine: 'Hematology Analyzer', 
+      sampleType: 'Blood',
+      parameters: [
+        { name: 'Hemoglobin (Hb)', val: '14.5', unit: 'g/dL', refRange: '12.0 - 16.0' },
+        { name: 'WBC Count', val: '7500', unit: '/cumm', refRange: '4000 - 11000' },
+        { name: 'Platelet Count', val: '2.5', unit: 'L/cumm', refRange: '1.5 - 4.5' }
+      ]
+    },
+    { 
+      testName: 'ESR', 
+      b2cPrice: 150.00, 
+      b2bPrice: 90.00, 
+      department: 'Hematology', 
+      machine: 'Hematology Analyzer', 
+      sampleType: 'Blood',
+      parameters: [
+        { name: 'ESR', val: '12', unit: 'mm/hr', refRange: '0 - 20' }
+      ]
+    },
+    { 
+      testName: 'HbA1c', 
+      b2cPrice: 450.00, 
+      b2bPrice: 250.00, 
+      department: 'Biochemistry', 
+      machine: 'Weldon WB-150 Biochemistry Analyzer', 
+      sampleType: 'Blood',
+      parameters: [
+        { name: 'HbA1c', val: '5.6', unit: '%', refRange: '< 5.7%' }
+      ]
+    },
+    { 
+      testName: 'Lipid Profile', 
+      b2cPrice: 650.00, 
+      b2bPrice: 400.00, 
+      department: 'Biochemistry', 
+      machine: 'Weldon WB-150 Biochemistry Analyzer', 
+      sampleType: 'Blood',
+      parameters: [
+        { name: 'Total Cholesterol', val: '180', unit: 'mg/dL', refRange: '< 200' },
+        { name: 'Triglycerides', val: '140', unit: 'mg/dL', refRange: '< 150' },
+        { name: 'HDL Cholesterol', val: '45', unit: 'mg/dL', refRange: '> 40' }
+      ]
+    },
+    { 
+      testName: 'Thyroid Profile', 
+      b2cPrice: 800.00, 
+      b2bPrice: 500.00, 
+      department: 'Immunology (CLIA)', 
+      machine: 'Maglumi 800', 
+      sampleType: 'Serum',
+      parameters: [
+        { name: 'TSH', val: '2.50', unit: 'uIU/mL', refRange: '0.45 - 4.50' },
+        { name: 'Free T4', val: '1.2', unit: 'ng/dL', refRange: '0.8 - 1.8' }
+      ]
+    },
+    { 
+      testName: 'Urine Routine', 
+      b2cPrice: 200.00, 
+      b2bPrice: 120.00, 
+      department: 'Clinical Pathology', 
+      machine: 'Urine Analyzer', 
+      sampleType: 'Urine',
+      parameters: [
+        { name: 'Urine Protein', val: 'Nil', unit: '-', refRange: 'Nil' },
+        { name: 'Urine Glucose', val: 'Nil', unit: '-', refRange: 'Nil' },
+        { name: 'Pus Cells', val: '2-3', unit: '/hpf', refRange: '0-5' }
+      ]
+    },
+    { 
+      testName: 'Liver Function Test (LFT)', 
+      b2cPrice: 750.00, 
+      b2bPrice: 450.00, 
+      department: 'Biochemistry', 
+      machine: 'Weldon WB-150 Biochemistry Analyzer', 
+      sampleType: 'Blood',
+      parameters: [
+        { name: 'SGOT (AST)', val: '25', unit: 'U/L', refRange: '5 - 40' },
+        { name: 'SGPT (ALT)', val: '30', unit: 'U/L', refRange: '7 - 56' },
+        { name: 'Total Bilirubin', val: '0.8', unit: 'mg/dL', refRange: '0.1 - 1.2' }
+      ]
+    },
+    { 
+      testName: 'Kidney Function Test (KFT)', 
+      b2cPrice: 700.00, 
+      b2bPrice: 420.00, 
+      department: 'Biochemistry', 
+      machine: 'Weldon WB-150 Biochemistry Analyzer', 
+      sampleType: 'Blood',
+      parameters: [
+        { name: 'Blood Urea', val: '28', unit: 'mg/dL', refRange: '15 - 45' },
+        { name: 'Serum Creatinine', val: '0.9', unit: 'mg/dL', refRange: '0.6 - 1.2' }
+      ]
+    },
+    { 
+      testName: 'Electrolytes', 
+      b2cPrice: 400.00, 
+      b2bPrice: 250.00, 
+      department: 'Clinical Chemistry', 
+      machine: 'Electrolyte Analyzer', 
+      sampleType: 'Serum',
+      parameters: [
+        { name: 'Sodium', val: '140', unit: 'mmol/L', refRange: '135 - 145' },
+        { name: 'Potassium', val: '4.2', unit: 'mmol/L', refRange: '3.5 - 5.0' }
+      ]
+    },
+    { 
+      testName: 'CRP', 
+      b2cPrice: 300.00, 
+      b2bPrice: 180.00, 
+      department: 'Serology / POCT', 
+      machine: 'Rapid Test Analyzer', 
+      sampleType: 'Serum',
+      parameters: [
+        { name: 'C-Reactive Protein (CRP)', val: '3.0', unit: 'mg/L', refRange: '< 6.0' }
+      ]
+    }
+  ]);
+
   // LIS State Variables
-  const [labRequests, setLabRequests] = useState([
-    { id: 'SMP-000001', specimenId: 'SPM-000001', patientId: 'PAT-000001', patientName: 'Al Amin', testName: 'Complete Blood Count (CBC)', status: 'Verified', result: 'Hb: 14.5 g/dL, WBC: 7,500/cumm', collectedAt: '2026-06-16 09:30 AM', verifiedAt: '2026-06-16 10:15 AM' },
-    { id: 'SMP-000002', specimenId: 'SPM-000002', patientId: 'PAT-000002', patientName: 'Faraj Bin Ahmad', testName: 'Lipid Profile', status: 'Pending Verification', result: 'Cholesterol: 240 mg/dL (High)', collectedAt: '2026-06-16 10:00 AM', verifiedAt: null },
-    { id: 'SMP-000003', specimenId: 'SPM-000003', patientId: 'PAT-000004', patientName: 'Muammar Ghazzawi', testName: 'Thyroid Profile (TSH)', status: 'Processing', result: null, collectedAt: '2026-06-16 10:30 AM', verifiedAt: null },
-    { id: 'SMP-000004', specimenId: 'SPM-000004', patientId: 'PAT-000003', patientName: 'Fayruz Husniya', testName: 'Blood Sugar Fasting (FBS)', status: 'Collected', result: null, collectedAt: '2026-06-16 11:00 AM', verifiedAt: null },
-  ]);
-  const [labOrders, setLabOrders] = useState([
-    {
-      labOrderNumber: 'LAB-000001',
-      patientId: 'PAT-000001',
-      patientName: 'Al Amin',
-      visitId: 'VIS-000001',
-      status: 'Pending Sample Collection',
-      orderTime: '16/06/2026 09:15 AM',
-      orderedTests: ['CBC', 'HbA1c', 'Lipid Profile'],
-      doctorName: 'Dr. Aditya Dev'
-    },
-    {
-      labOrderNumber: 'LAB-000002',
-      patientId: 'PAT-000002',
-      patientName: 'Faraj Bin Ahmad',
-      visitId: 'VIS-000002',
-      status: 'Pending Sample Collection',
-      orderTime: '17/06/2026 09:30 AM',
-      orderedTests: ['Lipid Profile', 'Kidney Function Test (KFT)'],
-      doctorName: 'Dr. R. Kumar'
-    }
-  ]);
-  const [labTasks, setLabTasks] = useState([
-    {
-      taskId: 'LAB-2026-0001',
-      patientId: 'RK-0001',
-      clinicPatientId: 'PAT-000001',
-      patientName: 'Al Amin',
-      age: 32,
-      gender: 'Male',
-      phone: '9440183421',
-      doctorName: 'Dr. Aditya Dev',
-      opdNumber: 'Token 102',
-      specimenId: 'RKLAB-0001',
-      status: 'Verified',
-      orderedTests: ['CBC', 'HbA1c', 'Lipid Profile'],
-      testResults: {
-        'CBC': { val: 'Hemoglobin (Hb): 14.5 g/dL (Ref: 12-16), WBC: 7,500/cumm (Ref: 4000-11000), Platelet Count: 2.8 L/cumm', machine: 'Hematology Analyzer', completedAt: '2026-06-16 10:15 AM' },
-        'HbA1c': { val: 'HbA1c: 5.6 % (Normal) (Ref: < 5.7%)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-06-16 10:20 AM' },
-        'Lipid Profile': { val: 'Total Cholesterol: 180 mg/dL (Ref: < 200), HDL: 45 mg/dL (Ref: > 40), Triglycerides: 140 mg/dL (Ref: < 150)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-06-16 10:25 AM' }
-      },
-      verifiedBy: 'Dr. S. Vardhan, MD',
-      verifiedAt: '2026-06-16 11:00 AM',
-      remarks: 'All parameters within physiological limits.'
-    },
-    {
-      taskId: 'LAB-2026-0001-H1',
-      patientId: 'RK-0001',
-      clinicPatientId: 'PAT-000001',
-      patientName: 'Al Amin',
-      age: 32,
-      gender: 'Male',
-      phone: '9440183421',
-      doctorName: 'Dr. Aditya Dev',
-      opdNumber: 'Token 45',
-      specimenId: 'RKLAB-0001-H1',
-      status: 'Verified',
-      orderedTests: ['CBC', 'HbA1c', 'Lipid Profile'],
-      testResults: {
-        'CBC': { val: 'Hemoglobin (Hb): 13.2 g/dL (Ref: 12-16), WBC: 8,200/cumm, Platelet Count: 2.5 L/cumm', machine: 'Hematology Analyzer', completedAt: '2026-05-15 10:15 AM' },
-        'HbA1c': { val: 'HbA1c: 6.4 % (High) (Ref: < 5.7%)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-05-15 10:20 AM' },
-        'Lipid Profile': { val: 'Total Cholesterol: 220 mg/dL (High) (Ref: < 200), HDL: 40 mg/dL (Ref: > 40), Triglycerides: 160 mg/dL (High) (Ref: < 150)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-05-15 10:25 AM' }
-      },
-      verifiedBy: 'Dr. S. Vardhan, MD',
-      verifiedAt: '2026-05-15 11:00 AM',
-      remarks: 'HbA1c and Lipids elevated. Patient advised diet modifications.'
-    },
-    {
-      taskId: 'LAB-2026-0001-H2',
-      patientId: 'RK-0001',
-      clinicPatientId: 'PAT-000001',
-      patientName: 'Al Amin',
-      age: 32,
-      gender: 'Male',
-      phone: '9440183421',
-      doctorName: 'Dr. Aditya Dev',
-      opdNumber: 'Token 82',
-      specimenId: 'RKLAB-0001-H2',
-      status: 'Verified',
-      orderedTests: ['CBC', 'HbA1c', 'Lipid Profile'],
-      testResults: {
-        'CBC': { val: 'Hemoglobin (Hb): 13.9 g/dL (Ref: 12-16), WBC: 7,900/cumm, Platelet Count: 2.7 L/cumm', machine: 'Hematology Analyzer', completedAt: '2026-06-01 10:15 AM' },
-        'HbA1c': { val: 'HbA1c: 5.9 % (High) (Ref: < 5.7%)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-06-01 10:20 AM' },
-        'Lipid Profile': { val: 'Total Cholesterol: 195 mg/dL (Normal) (Ref: < 200), HDL: 43 mg/dL (Ref: > 40), Triglycerides: 145 mg/dL (Normal) (Ref: < 150)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-06-01 10:25 AM' }
-      },
-      verifiedBy: 'Dr. S. Vardhan, MD',
-      verifiedAt: '2026-06-01 11:00 AM',
-      remarks: 'HbA1c showing improvement. Continue medications.'
-    },
-    {
-      taskId: 'LAB-2026-0002',
-      patientId: 'RK-0002',
-      clinicPatientId: 'PAT-000002',
-      patientName: 'Faraj Bin Ahmad',
-      age: 23,
-      gender: 'Male',
-      phone: '8220019234',
-      doctorName: 'Dr. R. Kumar',
-      opdNumber: 'Token 101',
-      specimenId: 'RKLAB-0002',
-      status: 'Pending Verification',
-      orderedTests: ['Lipid Profile', 'Kidney Function Test (KFT)'],
-      testResults: {
-        'Lipid Profile': { val: 'Total Cholesterol: 240 mg/dL (High) (Ref: < 200), HDL: 38 mg/dL (Low) (Ref: > 40), Triglycerides: 165 mg/dL (High) (Ref: < 150)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-06-17 09:45 AM' },
-        'Kidney Function Test (KFT)': { val: 'Blood Urea: 28 mg/dL (Ref: 15-45), Serum Creatinine: 1.4 mg/dL (High) (Ref: 0.6-1.2)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-06-17 09:50 AM' }
-      },
-      verifiedBy: null,
-      verifiedAt: null,
-      remarks: ''
-    },
-    {
-      taskId: 'LAB-2026-0002-H1',
-      patientId: 'RK-0002',
-      clinicPatientId: 'PAT-000002',
-      patientName: 'Faraj Bin Ahmad',
-      age: 23,
-      gender: 'Male',
-      phone: '8220019234',
-      doctorName: 'Dr. R. Kumar',
-      opdNumber: 'Token 12',
-      specimenId: 'RKLAB-0002-H1',
-      status: 'Verified',
-      orderedTests: ['Lipid Profile', 'Kidney Function Test (KFT)'],
-      testResults: {
-        'Lipid Profile': { val: 'Total Cholesterol: 260 mg/dL (High) (Ref: < 200), HDL: 35 mg/dL (Low) (Ref: > 40), Triglycerides: 180 mg/dL (High) (Ref: < 150)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-05-10 10:45 AM' },
-        'Kidney Function Test (KFT)': { val: 'Blood Urea: 35 mg/dL (Ref: 15-45), Serum Creatinine: 1.6 mg/dL (High) (Ref: 0.6-1.2)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-05-10 10:50 AM' }
-      },
-      verifiedBy: 'Dr. S. Vardhan, MD',
-      verifiedAt: '2026-05-10 11:30 AM',
-      remarks: 'Elevated creatinine and lipids. Recommend metabolic evaluation.'
-    },
-    {
-      taskId: 'LAB-2026-0002-H2',
-      patientId: 'RK-0002',
-      clinicPatientId: 'PAT-000002',
-      patientName: 'Faraj Bin Ahmad',
-      age: 23,
-      gender: 'Male',
-      phone: '8220019234',
-      doctorName: 'Dr. R. Kumar',
-      opdNumber: 'Token 66',
-      specimenId: 'RKLAB-0002-H2',
-      status: 'Verified',
-      orderedTests: ['Lipid Profile', 'Kidney Function Test (KFT)'],
-      testResults: {
-        'Lipid Profile': { val: 'Total Cholesterol: 250 mg/dL (High) (Ref: < 200), HDL: 37 mg/dL (Low) (Ref: > 40), Triglycerides: 170 mg/dL (High) (Ref: < 150)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-05-25 09:45 AM' },
-        'Kidney Function Test (KFT)': { val: 'Blood Urea: 32 mg/dL (Ref: 15-45), Serum Creatinine: 1.5 mg/dL (High) (Ref: 0.6-1.2)', machine: 'Weldon WB-150 Biochemistry Analyzer', completedAt: '2026-05-25 09:50 AM' }
-      },
-      verifiedBy: 'Dr. S. Vardhan, MD',
-      verifiedAt: '2026-05-25 10:30 AM',
-      remarks: 'Creatinine remains border high. Monitor hydration status.'
-    },
-    {
-      taskId: 'LAB-2026-0003',
-      patientId: 'RK-0003',
-      clinicPatientId: 'PAT-000004',
-      patientName: 'Muammar Ghazzawi',
-      age: 55,
-      gender: 'Male',
-      phone: '9884029348',
-      doctorName: 'Dr. Aditya Dev',
-      opdNumber: 'Token 103',
-      specimenId: 'RKLAB-0003',
-      status: 'Processing',
-      orderedTests: ['Thyroid Profile', 'Electrolytes'],
-      testResults: {
-        'Thyroid Profile': { val: 'TSH: 6.2 uIU/mL (High) (Ref: 0.45 - 4.50), Free T4: 1.1 ng/dL (Ref: 0.8 - 1.8)', machine: 'Maglumi 800', completedAt: '2026-06-17 11:30 AM' }
-      },
-      verifiedBy: null,
-      verifiedAt: null,
-      remarks: ''
-    }
-  ]);
+  const [labRequests, setLabRequests] = useState([]);
+  const [labOrders, setLabOrders] = useState([]);
+  const [labTasks, setLabTasks] = useState([]);
   const [labActiveTab, setLabActiveTab] = useState('dashboard');
   const [ipdActiveTab, setIpdActiveTab] = useState('dashboard');
 
   // Doctor-Laboratory Integration: Structured Critical Alerts
-  const [labAlerts, setLabAlerts] = useState([
-    {
-      id: 'ALERT-001',
-      patientId: 'PAT-000002',
-      patientName: 'Faraj Bin Ahmad',
-      orderNumber: 'LAB-2026-0002',
-      testName: 'Lipid Profile',
-      parameter: 'Total Cholesterol',
-      value: '240 mg/dL',
-      refRange: '< 200 mg/dL',
-      severity: 'High',
-      acknowledged: false,
-      acknowledgedBy: null,
-      acknowledgedAt: null,
-      createdAt: '2026-06-17 09:45 AM'
-    },
-    {
-      id: 'ALERT-002',
-      patientId: 'PAT-000002',
-      patientName: 'Faraj Bin Ahmad',
-      orderNumber: 'LAB-2026-0002',
-      testName: 'Kidney Function Test (KFT)',
-      parameter: 'Serum Creatinine',
-      value: '1.4 mg/dL',
-      refRange: '0.6 - 1.2 mg/dL',
-      severity: 'High',
-      acknowledged: false,
-      acknowledgedBy: null,
-      acknowledgedAt: null,
-      createdAt: '2026-06-17 09:50 AM'
-    }
-  ]);
+  const [labAlerts, setLabAlerts] = useState([]);
 
   // Doctor-Laboratory Integration: LIS Analyzer Connection Metadata
   const [analyzerConnections, setAnalyzerConnections] = useState([
@@ -429,7 +204,7 @@ export function ClinicProvider({ children }) {
           const data = await res.json();
           if (data.user) {
             setUser({
-              username: data.user.fullName || data.user.email,
+              username: data.user.full_name || data.user.fullName || data.user.email,
               role: data.user.role,
               email: data.user.email
             });
@@ -446,6 +221,94 @@ export function ClinicProvider({ children }) {
     // Poll /api/lab/alerts for critical alerts if needed.
   }, []);
 
+  React.useEffect(() => {
+    // Only open the realtime stream for an authenticated session. Opening it on
+    // the login screen would hit the auth-gated endpoint, 401, and retry-loop.
+    if (!user) return;
+
+    let eventSource;
+    let retryTimeout;
+    let retryDelay = 5000;
+    let closed = false;
+
+    const connectSSE = () => {
+      if (closed) return;
+      eventSource = new EventSource('/api/lab/realtime');
+
+      // Reset backoff once a connection is established.
+      eventSource.onopen = () => { retryDelay = 5000; };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+
+          if (payload.type === 'STATUS_UPDATE') {
+            const { taskId, status, machineName, barcode, timestamp } = payload.data;
+
+            // 1. Update labTasks state
+            setLabTasks(prev => prev.map(t => {
+              if (t.taskId === taskId || t.specimenId === barcode) {
+                return {
+                  ...t,
+                  status,
+                  processingStatus: status,
+                  machineAssigned: machineName,
+                  analyzerStartedAt: timestamp
+                };
+              }
+              return t;
+            }));
+
+            // 2. Update labOrders state
+            setLabOrders(prev => prev.map(o => {
+              if (o.labOrderNumber === taskId) {
+                return {
+                  ...o,
+                  status,
+                  processingStatus: status,
+                  machineAssigned: machineName,
+                  analyzerStartedAt: timestamp
+                };
+              }
+              return o;
+            }));
+
+            // 3. Log to nursing notes
+            setNursingNotes(prev => [
+              {
+                time: 'Just now',
+                author: `LIS Scanner (${machineName})`,
+                priority: 'Routine',
+                patientId: payload.data.patientId || taskId,
+                text: `Real-time scan: Specimen barcode ${barcode} read by ${machineName}. Machine run started.`
+              },
+              ...prev
+            ]);
+          }
+        } catch (err) {
+          console.error("Failed to parse SSE event data:", err);
+        }
+      };
+
+      // SSE errors fire on transient drops and on normal close. Reconnect
+      // quietly with exponential backoff instead of spamming the console.
+      eventSource.onerror = () => {
+        if (eventSource) eventSource.close();
+        if (closed) return;
+        retryTimeout = setTimeout(connectSSE, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 60000);
+      };
+    };
+
+    connectSSE();
+
+    return () => {
+      closed = true;
+      if (eventSource) eventSource.close();
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
+  }, [user]);
+
   const login = async (usernameOrEmail, password, selectedRole) => {
     try {
       const res = await fetch('/api/auth/login', {
@@ -456,7 +319,7 @@ export function ClinicProvider({ children }) {
       if (res.ok) {
         const data = await res.json();
         setUser({
-          username: data.user.fullName || data.user.email,
+          username: data.user.full_name || data.user.fullName || data.user.email,
           role: data.user.role,
           email: data.user.email
         });
@@ -747,9 +610,65 @@ export function ClinicProvider({ children }) {
     setInventory(prev => prev.filter(i => i.id !== id));
   };
 
-  // 4. Billing Operations
-  const recordPayment = (invoiceId, mode) => {
-    setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'Paid', mode } : inv));
+  const recordPayment = (invoiceId, mode, amountPaid = null) => {
+    setInvoices(prev => prev.map(inv => {
+      if (inv.id === invoiceId) {
+        const newPaid = amountPaid !== null ? parseFloat(amountPaid) : inv.amount;
+        const balance = parseFloat((inv.amount - newPaid).toFixed(2));
+        const status = balance <= 0 ? 'Paid' : 'Partial';
+        
+        if (inv.labOrderNumber) {
+          setLabOrders(orders => orders.map(o => {
+            if (o.labOrderNumber === inv.labOrderNumber) {
+              const updatedPaymentStatus = status === 'Paid' ? 'Fully Paid' : 'Partially Paid';
+              let nextStatus = o.status;
+              
+              if (o.status === 'Payment Verification' && status === 'Paid') {
+                nextStatus = 'Ready for Delivery';
+              }
+              
+              return {
+                ...o,
+                amountPaid: newPaid,
+                balance,
+                paymentStatus: updatedPaymentStatus,
+                status: nextStatus
+              };
+            }
+            return o;
+          }));
+
+          setLabTasks(tasks => tasks.map(t => {
+            if (t.taskId === inv.labOrderNumber) {
+              const updatedPaymentStatus = status === 'Paid' ? 'Fully Paid' : 'Partially Paid';
+              let nextStatus = t.status;
+              
+              if (t.status === 'Payment Verification' && status === 'Paid') {
+                nextStatus = 'Ready for Delivery';
+              }
+              
+              return {
+                ...t,
+                amountPaid: newPaid,
+                balance,
+                paymentStatus: updatedPaymentStatus,
+                status: nextStatus
+              };
+            }
+            return t;
+          }));
+        }
+
+        return { 
+          ...inv, 
+          status, 
+          mode, 
+          amountPaid: newPaid, 
+          balance 
+        };
+      }
+      return inv;
+    }));
   };
 
   const createInvoice = (patientId, items, paymentMode, status) => {
@@ -767,6 +686,21 @@ export function ClinicProvider({ children }) {
 
     setInvoices(prev => [...prev, newInvoice]);
     return billId;
+  };
+
+  const addB2BPartner = (partnerData) => {
+    const nextId = `PART-${(partners.length + 1).toString().padStart(3, '0')}`;
+    const newPartner = {
+      id: nextId,
+      ...partnerData,
+      discount: parseFloat(partnerData.discount || 0)
+    };
+    setPartners(prev => [...prev, newPartner]);
+    return newPartner;
+  };
+
+  const deleteB2BPartner = (partnerId) => {
+    setPartners(prev => prev.filter(p => p.id !== partnerId));
   };
 
   // 5. User management
@@ -915,14 +849,12 @@ export function ClinicProvider({ children }) {
     } : t));
   };
 
-  // 4. Generate Lab Report: Verified → Report Generated
+  // 4. Generate Lab Report: Verified → Report Generated (No status override)
   const generateLabReport = (orderNum) => {
     const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
       ...o,
-      status: 'Report Generated',
-      processingStatus: 'Report Generated',
       reportGeneratedAt: timestamp
     } : o));
 
@@ -930,8 +862,6 @@ export function ClinicProvider({ children }) {
       if (t.taskId === orderNum) {
         return {
           ...t,
-          status: 'Report Generated',
-          processingStatus: 'Report Generated',
           reportGeneratedAt: timestamp
         };
       }
@@ -957,10 +887,10 @@ export function ClinicProvider({ children }) {
 
     setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
       ...o,
-      status: 'Report Delivered',
-      processingStatus: 'Report Delivered',
+      status: 'Delivered',
+      processingStatus: 'Delivered',
       reportDeliveredAt: timestamp,
-      reportDeliveredTo: deliveredToDoctorName || 'Doctor'
+      reportDeliveredTo: deliveredToDoctorName || 'Patient/Doctor'
     } : o));
 
     setLabTasks(prev => prev.map(t => {
@@ -970,15 +900,15 @@ export function ClinicProvider({ children }) {
           author: 'LIS Report Delivery',
           priority: 'Routine',
           patientId: t.clinicPatientId,
-          text: `Lab Report Delivered to ${deliveredToDoctorName || 'Doctor'} for order ${orderNum}. Tests: ${t.orderedTests.join(', ')}.`
+          text: `Lab Report Delivered to ${deliveredToDoctorName || 'Patient/Doctor'} for order ${orderNum}. Tests: ${t.orderedTests.join(', ')}.`
         }, ...notes]);
 
         return {
           ...t,
-          status: 'Report Delivered',
-          processingStatus: 'Report Delivered',
+          status: 'Delivered',
+          processingStatus: 'Delivered',
           reportDeliveredAt: timestamp,
-          reportDeliveredTo: deliveredToDoctorName || 'Doctor'
+          reportDeliveredTo: deliveredToDoctorName || 'Patient/Doctor'
         };
       }
       return t;
@@ -1196,6 +1126,9 @@ export function ClinicProvider({ children }) {
       labAlerts, setLabAlerts,
       analyzerConnections, setAnalyzerConnections,
       barcodeTracking, setBarcodeTracking,
+      partners, setPartners,
+      editAudits, setEditAudits,
+      labTestsMaster, setLabTestsMaster,
 
       // Doctor-Laboratory Integration: New Actions
       registerLabSample,
@@ -1233,9 +1166,10 @@ export function ClinicProvider({ children }) {
       
       // LIS Actions
       // LIS Actions
-      createLabOrder: (patientId, tests, docName, notes, priority = 'Routine') => {
+      createLabOrder: (patientId, tests, docName, notes, priority = 'Routine', customerType = 'Walk-in', partnerId = '') => {
         if (!tests || tests.length === 0) return null;
         const pat = patients.find(p => p.id === patientId);
+        const partner = partners.find(p => p.id === partnerId);
         
         const year = new Date().getFullYear();
         const yearPrefix = `LAB-${year}-`;
@@ -1245,6 +1179,45 @@ export function ClinicProvider({ children }) {
         const visitId = `VIS-${year}-${serialNum}`;
         const timestamp = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         
+        // Calculate charges based on B2B/B2C selection
+        let totalCharges = 0;
+        const invoiceItems = [];
+        
+        tests.forEach(testName => {
+          const master = labTestsMaster.find(t => t.testName === testName || t.testName.toLowerCase().includes(testName.toLowerCase()) || testName.toLowerCase().includes(t.testName.toLowerCase()));
+          const price = master 
+            ? (customerType === 'Walk-in' ? master.b2cPrice : master.b2bPrice)
+            : 300.00;
+          
+          totalCharges += price;
+          invoiceItems.push({ desc: `Lab Test: ${testName}`, price });
+        });
+
+        // Calculate partner-specific discount
+        let discount = 0;
+        if (customerType !== 'Walk-in' && partner) {
+          discount = parseFloat(((totalCharges * partner.discount) / 100).toFixed(2));
+        }
+
+        const grandTotal = parseFloat((totalCharges - discount).toFixed(2));
+        
+        // Automatically create a linked invoice in the billing ledger
+        const billId = `RK-INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+        const newInvoice = {
+          id: billId,
+          date: new Date().toISOString().split('T')[0],
+          patientId: patientId,
+          amount: grandTotal,
+          mode: customerType === 'Walk-in' ? 'Cash' : 'Credit',
+          status: 'Pending',
+          items: invoiceItems,
+          labOrderNumber: orderNum,
+          customerType,
+          partnerName: partner ? partner.name : ''
+        };
+
+        setInvoices(prev => [...prev, newInvoice]);
+
         const newOrder = {
           labOrderNumber: orderNum,
           patientId: patientId,
@@ -1262,7 +1235,17 @@ export function ClinicProvider({ children }) {
           resultSource: 'Manual Entry',
           sampleType: '',
           collectedBy: '',
-          collectionTime: ''
+          collectionTime: '',
+          
+          // Added Fields for B2B / B2C and Billing Integration
+          customerType,
+          partnerId,
+          totalCharges,
+          discount,
+          amountPaid: 0.00,
+          balance: grandTotal,
+          paymentStatus: 'Unpaid',
+          invoiceId: billId
         };
 
         setLabOrders(prev => {
@@ -1387,19 +1370,45 @@ export function ClinicProvider({ children }) {
         } : t));
       },
       saveLabResult: (orderNum, results, source) => {
+        const enhancedResults = { ...results };
+        
+        Object.keys(enhancedResults).forEach(testName => {
+          const resObj = enhancedResults[testName];
+          if (!resObj.parameters) {
+            const master = labTestsMaster.find(t => t.testName === testName || t.testName.toLowerCase().includes(testName.toLowerCase()) || testName.toLowerCase().includes(t.testName.toLowerCase()));
+            if (master && master.parameters) {
+              const params = master.parameters.map(p => {
+                const escapedName = p.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const regex = new RegExp(`${escapedName}:\\s*([0-9.]+|Nil|Active|Negative|Positive)`, 'i');
+                const match = resObj.val ? resObj.val.match(regex) : null;
+                return {
+                  ...p,
+                  val: match ? match[1] : p.val
+                };
+              });
+              resObj.parameters = params;
+            } else {
+              resObj.parameters = [{ name: testName, val: resObj.val, unit: '-', refRange: '-' }];
+            }
+          }
+          if (!resObj.remarks) resObj.remarks = 'Standard clinical observations verified.';
+          if (!resObj.interpretation) resObj.interpretation = 'Results within expected physiological limits.';
+        });
+
+        // Set status to Draft in both order and task
         setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
           ...o,
-          status: 'Completed',
-          processingStatus: 'Completed',
+          status: 'Draft',
+          processingStatus: 'Draft',
           resultSource: source
         } : o));
 
         setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
           ...t,
-          status: 'Completed',
-          processingStatus: 'Completed',
+          status: 'Draft',
+          processingStatus: 'Draft',
           resultSource: source,
-          testResults: { ...t.testResults, ...results }
+          testResults: { ...t.testResults, ...enhancedResults }
         } : t));
 
         setLabOrders(orders => {
@@ -1407,18 +1416,112 @@ export function ClinicProvider({ children }) {
           if (order) {
             setLabRequests(prev => prev.map(req => {
               if (req.patientId === order.patientId && (req.status === 'Collected' || req.status === 'Ordered' || req.status === 'Pending Sample Collection' || req.status === 'Sample Registered')) {
-                const testRes = results[req.testName];
+                const testRes = enhancedResults[req.testName];
                 return {
                   ...req,
-                  status: 'Pending Verification',
+                  status: 'Draft',
                   result: testRes ? testRes.val : 'Completed'
                 };
               }
               return req;
             }));
 
-            // Auto-detect abnormal/critical values and generate structured alerts
-            autoDetectAbnormals(orderNum, order.patientId, order.patientName, results);
+            autoDetectAbnormals(orderNum, order.patientId, order.patientName, enhancedResults);
+          }
+          return orders;
+        });
+      },
+      updateLabResult: (orderNum, testName, updatedParameters, remarks, interpretation, editedBy, reason) => {
+        const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        setLabTasks(prev => prev.map(t => {
+          if (t.taskId === orderNum) {
+            const currentTestRes = t.testResults[testName] || { val: '', machine: 'Manual Entry', completedAt: timestamp, parameters: [] };
+            const oldParams = currentTestRes.parameters || [];
+            
+            updatedParameters.forEach(up => {
+              const op = oldParams.find(p => p.name === up.name);
+              if (op && String(op.val) !== String(up.val)) {
+                const newAudit = {
+                  id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+                  lab_order_id: orderNum,
+                  test_name: testName,
+                  parameter_name: up.name,
+                  previous_value: op.val,
+                  updated_value: up.val,
+                  edited_by: editedBy || 'Technician',
+                  edited_at: timestamp,
+                  reason: reason || 'Manual correction'
+                };
+                setEditAudits(prevAudits => [...prevAudits, newAudit]);
+              }
+            });
+
+            // Reconstruct the val string
+            const valStr = updatedParameters.map(p => `${p.name}: ${p.val} ${p.unit} (Ref: ${p.refRange})`).join('\n');
+
+            const updatedTestRes = {
+              ...currentTestRes,
+              val: valStr,
+              parameters: updatedParameters,
+              remarks,
+              interpretation,
+              completedAt: timestamp
+            };
+
+            return {
+              ...t,
+              testResults: {
+                ...t.testResults,
+                [testName]: updatedTestRes
+              }
+            };
+          }
+          return t;
+        }));
+
+        setLabOrders(orders => {
+          const order = orders.find(o => o.labOrderNumber === orderNum);
+          if (order) {
+            setLabRequests(prev => prev.map(req => {
+              if (req.patientId === order.patientId && req.testName === testName) {
+                const valStr = updatedParameters.map(p => `${p.name}: ${p.val} ${p.unit}`).join(', ');
+                return {
+                  ...req,
+                  result: valStr
+                };
+              }
+              return req;
+            }));
+          }
+          return orders;
+        });
+      },
+      submitForVerification: (orderNum) => {
+        setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
+          ...o,
+          status: 'Pending Verification',
+          processingStatus: 'Pending Verification'
+        } : o));
+
+        setLabTasks(prev => prev.map(t => t.taskId === orderNum ? {
+          ...t,
+          status: 'Pending Verification',
+          processingStatus: 'Pending Verification'
+        } : t));
+
+        setLabOrders(orders => {
+          const order = orders.find(o => o.labOrderNumber === orderNum);
+          if (order) {
+            setLabRequests(prev => prev.map(req => {
+              if (req.patientId === order.patientId && req.status === 'Draft') {
+                return {
+                  ...req,
+                  status: 'Pending Verification'
+                };
+              }
+              return req;
+            }));
           }
           return orders;
         });
@@ -1426,11 +1529,21 @@ export function ClinicProvider({ children }) {
       verifyLabOrder: (orderNum, remarks, pathologistName) => {
         const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        setLabOrders(prev => prev.map(o => o.labOrderNumber === orderNum ? {
-          ...o,
-          status: 'Verified',
-          processingStatus: 'Verified'
-        } : o));
+        let isFullyPaid = false;
+        
+        setLabOrders(prev => {
+          const order = prev.find(o => o.labOrderNumber === orderNum);
+          const balance = order ? (order.balance !== undefined ? order.balance : 0) : 0;
+          isFullyPaid = order ? (order.paymentStatus === 'Fully Paid' || balance <= 0) : false;
+          
+          const nextStatus = isFullyPaid ? 'Ready for Delivery' : 'Payment Verification';
+          
+          return prev.map(o => o.labOrderNumber === orderNum ? {
+            ...o,
+            status: nextStatus,
+            processingStatus: nextStatus
+          } : o);
+        });
 
         setLabTasks(prev => prev.map(t => {
           if (t.taskId === orderNum) {
@@ -1445,10 +1558,12 @@ export function ClinicProvider({ children }) {
               ...notes
             ]);
 
+            const nextStatus = isFullyPaid ? 'Ready for Delivery' : 'Payment Verification';
+
             return {
               ...t,
-              status: 'Verified',
-              processingStatus: 'Verified',
+              status: nextStatus,
+              processingStatus: nextStatus,
               verifiedBy: pathologistName || 'Dr. S. Vardhan, MD',
               verifiedAt: timestamp,
               remarks: remarks
@@ -1461,7 +1576,7 @@ export function ClinicProvider({ children }) {
           const order = orders.find(o => o.labOrderNumber === orderNum);
           if (order) {
             setLabRequests(prev => prev.map(req => {
-              if (req.patientId === order.patientId && (req.status === 'Pending Verification' || req.status === 'Collected' || req.status === 'Ordered' || req.status === 'Sample Registered')) {
+              if (req.patientId === order.patientId && (req.status === 'Pending Verification' || req.status === 'Collected' || req.status === 'Ordered' || req.status === 'Sample Registered' || req.status === 'Draft')) {
                 return {
                   ...req,
                   status: 'Verified',

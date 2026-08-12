@@ -1,7 +1,12 @@
 import { query } from '@/lib/mysql/db';
+import { requireAuth } from '@/lib/auth-middleware';
+import { ROLES } from '@/lib/auth-config';
 
 export async function GET(request) {
   try {
+    const { response } = await requireAuth(...ROLES.LAB_READ);
+    if (response) return response;
+
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
     const status    = searchParams.get('status');

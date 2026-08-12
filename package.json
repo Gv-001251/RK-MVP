@@ -1,18 +1,52 @@
 {
   "name": "rk-clinic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "description": "RK Clinic LIS — hospital information system with direct analyzer integration",
+  "author": "RK Clinic",
+  "main": "build/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "desktop": "electron desktop/main.js",
+    "desktop:build": "node scripts/build-desktop.mjs",
+    "desktop:pack": "npm run desktop:build && electron-builder --mac --dir",
+    "desktop:dist": "npm run desktop:build && electron-builder --mac",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:baseline": "node scripts/migrate.mjs --baseline",
+    "db:seed": "node mysql/seed_users.js",
+    "db:seed:demo": "node mysql/seed_demo.mjs",
+    "db:seed:demo:clean": "node mysql/seed_demo.mjs --clean",
+    "analyzer:capture": "node tools/analyzer-capture.mjs",
+    "analyzer:scout": "node tools/analyzer-port-scout.mjs",
+    "analyzer:dial": "node tools/analyzer-dial.mjs",
+    "analyzer:afinion": "node tools/afinion-bridge.mjs",
+    "analyzer:afinion:dry": "node tools/afinion-bridge.mjs --dry-run",
+    "analyzer:serial": "node tools/analyzer-serial-capture.mjs",
+    "analyzer:serial:list": "node tools/analyzer-serial-capture.mjs --list",
+    "analyzer:serial:autobaud": "node tools/analyzer-serial-capture.mjs --autobaud",
+    "analyzer:serial:probe": "node tools/analyzer-serial-capture.mjs --probe-baud",
+    "analyzer:maglumi": "node tools/maglumi-bridge.mjs",
+    "analyzer:maglumi:dry": "node tools/maglumi-bridge.mjs --dry-run",
+    "analyzer:mispa": "node tools/mispa-bridge.mjs",
+    "analyzer:mispa:dry": "node tools/mispa-bridge.mjs --dry-run",
+    "analyzer:bridge": "node tools/lis-bridge.mjs",
+    "analyzer:replay": "node tools/lis-bridge.mjs --replay",
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "desktop:dist:win": "npm run desktop:build && electron-builder --win --x64"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
+    "dotenv": "^17.4.2",
     "html2canvas": "^1.4.1",
+    "ioredis": "^5.11.1",
     "jose": "^6.2.3",
+    "jsbarcode": "^3.12.3",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.17.0",
@@ -21,12 +55,72 @@
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "recharts": "^3.10.0",
+    "serialport": "13.0.0",
     "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "vitest": "^4.1.10"
+  },
+  "build": {
+    "appId": "in.rkclinic.lis",
+    "productName": "RK Clinic LIS",
+    "directories": {
+      "output": "dist-desktop",
+      "buildResources": "assets"
+    },
+    "files": [
+      "build/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "mac": {
+      "category": "public.app-category.medical",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "NSAllowsLocalNetworking": true
+      },
+      "icon": "assets/icon.png"
+    },
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "app/.next/standalone"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RK Clinic LIS"
+    },
+    "npmRebuild": false
   }
 }

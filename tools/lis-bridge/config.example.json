@@ -1,0 +1,114 @@
+{
+  "_README": "Copy to config.json and edit. transport: tcp-server (analyzer connects to the bridge) | tcp-client (bridge connects to analyzer, set host) | serial (set comPort/baud) | manual (no data interface). protocol: astm | hl7. Host-query (analyzer scans a barcode and asks the LIS what's ordered) is answered automatically for ASTM machines that send a query (Q) frame — no per-machine flag needed; HL7 host-query is not implemented yet. Reliability: every transport auto-recovers a dropped link (serial reopens every reconnectMs, default 5s; tcp-client reconnects; tcp-server re-accepts). Optional per-machine watchdogMs restarts a driver that goes silent while nominally connected (leave off for analyzers that idle between samples). One machine's fault never affects the others. Fields marked _confirm MUST be verified from each analyzer's LIS/Host protocol document before go-live.",
+  "lis": {
+    "endpoint": "http://localhost:3000/api/lab/analyzer/results",
+    "hostQueryEndpoint": "http://localhost:3000/api/lab/host-query",
+    "apiKey": "REPLACE_WITH_LIS_ANALYZER_API_KEY"
+  },
+  "queueDir": "./.queue",
+  "machines": [
+    {
+      "id": "maglumi800",
+      "name": "Snibe Maglumi 800 (Immunoassay)",
+      "transport": "serial",
+      "comPort": "/dev/tty.usbserial-MAGLUMI",
+      "baud": 9600,
+      "protocol": "astm",
+      "driver": "tools/maglumi-bridge.mjs",
+      "_protocol": "SETTLED FROM THE VENDOR MANUAL 2026-08-08 (Maglumi 800 Operating Instructions, ch.16): ASTM E1394 over RS-232, NOT HL7 — the 'hl7' here was a wrong guess. Note the link layer is Snibe's stripped-down variant, not textbook E1381: a lone STX, no frame number, no checksum, no CR LF after the terminator, and an ACK expected after every control byte INCLUDING the EOT. Record layout also differs from the earlier implementation: sender is field 5 and receiver field 10 (field 4 is a password), so an earlier revision read the password as the sender. tools/maglumi-bridge.mjs speaks both dialects and auto-detects; tests/astm.test.mjs asserts against the manual's literal examples.",
+      "_confirm": "NEVER TESTED AGAINST THE INSTRUMENT. Before go-live: (1) read Baud/Data bits/Stop bits/Parity off the analyzer's [Online] screen — 9600 8N1 here is still a guess; (2) note whether its Protocol is set to 'ASTM (COM)' or 'ASTM (TCP/IP)', because TCP/IP is far less fragile than a USB-serial adapter whose device name changes on every replug; (3) the LIS cable goes to a SPARE COM port on the analyzer's control PC, NOT the RS232 socket on the analyzer itself — that one carries the instrument-to-PC link; (4) PC-to-PC means DTE-to-DTE, so a null-modem crossover is almost certainly required. Analyzer ID and Host ID are set on that same screen and must match MAGLUMI_ASTM_ID / LIS_ASTM_ID."
+    },
+    {
+      "id": "mispaplus",
+      "name": "Mispa Plus (Agappe, Biochemistry)",
+      "transport": "tcp-server",
+      "port": 8888,
+      "protocol": "mispa-line",
+      "driver": "tools/mispa-bridge.mjs",
+      "_verified": "2026-08-07 on the bench. The analyzer sits at 192.168.1.2 and dials this host on TCP 8888. Direction is settled: its System Settings > Connectivity screen offers only a 'Server IP' field (set to 192.168.1.3, this Mac's address on the direct cable) and a port probe found it listening on nothing while actively refusing 9 ports, so it is the client and we are the server. The port is not shown anywhere on the instrument; 8888 was found with tools/analyzer-port-scout.mjs. Note the earlier guess of 8081 was wrong.",
+      "_protocol": "PROTOCOL SETTLED 2026-08-07 18:18 by running a test on the instrument, which produced the first frame it has ever sent: '$07/08/2026|000000000029|mbglu|28.1945|mg/dL|1#' followed by LF CR (in that order). It is NOT ASTM and NOT HL7 — the earlier 'astm' entry here was a wrong guess. One result per frame, '$' 0x24 opens and '#' 0x23 closes, fields pipe-delimited: DD/MM/YYYY date, 12-digit zero-padded sample number, test code with an 'mb' prefix, value, unit, then one field of unknown meaning. No checksum, no sequence number, and no acknowledgement expected — it sent the line once, never retransmitted it, and held the socket. Driver: tools/mispa-bridge.mjs, unit-tested against the captured bytes in tests/mispa.test.mjs.",
+      "_confirm": "Two things still open. (1) Only the code 'mbglu' has been seen, so the rest of the panel's codes are unmapped — the driver posts unknown codes under the instrument's own name and logs them, so running a full panel once is all that is needed to complete the map. (2) The sample number it transmits is its OWN worklist counter (29), not the LIS accession, so results cannot barcode-match and land in the Exception Queue. Typing the LIS accession into the instrument's sample id field is what makes them match by themselves. Also note the sixth field was '1' in the only frame seen; meaning unknown, currently carried through and ignored."
+    },
+    {
+      "id": "hemat60",
+      "name": "Hemat 60 (Hematology)",
+      "transport": "tcp-server",
+      "port": 8080,
+      "protocol": "hl7",
+      "_verified": "Confirmed in production by tools/lis-bridge.mjs, which parses real frames from this instrument: HL7 v2.3.1 ORU^R01 over MLLP, firmware V1.3.1.33. It dials this host on 8080 and sends a bare STX every 3s as a keep-alive (not a handshake — it needs no reply). Was listed as 'astm' here until the working driver proved otherwise."
+    },
+    {
+      "id": "mbplus",
+      "name": "MB+ Electrolyte Analyzer",
+      "transport": "serial",
+      "comPort": "/dev/tty.usbserial-MBPLUS",
+      "baud": 9600,
+      "protocol": "astm",
+      "reconnectMs": 5000,
+      "watchdogMs": 0,
+      "_confirm": "Use the 'LIS USB' port (USB-serial). Ignore JTAG (debug only). Confirm baud + protocol. reconnectMs = auto-reopen delay if the serial link drops. watchdogMs = restart this driver if it goes silent that long while nominally connected (0/omit = off; only enable for machines that transmit periodically)."
+    },
+    {
+      "id": "uriplus300",
+      "name": "Uri-Plus 300 (Urine, has barcode scanner)",
+      "transport": "serial",
+      "comPort": "/dev/tty.PL2303G-USBtoUART1140",
+      "baud": 9600,
+      "protocol": "astm",
+      "_verified": "2026-08-07, read off the instrument's own setup screen: Baud rate 9600 (so the 9600 guess here was right), LIS mode 'H-800', Test Mode 'Slow Mode', SN 20240108110005. Reached through the Prolific USB-RS232 adapter (vid 067b pid 23a3, sn ENAEb148313) which macOS binds with com.prolific.cdc.PLCdcFSDriver 1.4. NOTE the comPort name is the adapter's USB location (…1140) and will change if the adapter moves to a different physical port — check with `npm run analyzer:serial:list` after replugging.",
+      "_confirm": "Protocol UNVERIFIED — 'astm' is still a guess. The instrument's LIS setting reads 'H-800', which is a vendor preset, not a standard, and it is cyclable so other modes exist. Nothing has been captured yet: an ASTM ENQ at all 8 standard baud rates drew no reply and the RS-232 control lines (CTS/DSR/DCD) are all low, which is also consistent with a straight-through cable where a null-modem is needed. Run a strip with a capture attached before writing the driver. Also still open: whether it transmits the specimen barcode from its onboard scanner, which decides if results auto-match to orders."
+    },
+    {
+      "id": "rapidstar20",
+      "name": "Rapid Star 20",
+      "transport": "serial",
+      "comPort": "/dev/tty.usbmodem-RAPIDSTAR",
+      "baud": 9600,
+      "protocol": "astm",
+      "_confirm": "USB (likely USB-CDC serial). Confirm device path + protocol + whether it sends a sample ID."
+    },
+    {
+      "id": "afinion2",
+      "name": "Afinion 2 (Abbott, POCT)",
+      "transport": "tcp-client",
+      "host": "192.168.1.5",
+      "port": 5555,
+      "protocol": "afinion-dle",
+      "_verified": "2026-08-07 on the bench, captured live with tools/analyzer-dial.mjs. Static IP 192.168.1.5/24, gateway blank, hostname AF20095065, MAC 8c:1f:64:cf:cb:4f. DIRECTION IS THE OPPOSITE OF THE OTHER TCP MACHINES HERE: it LISTENS on 5555, so the bridge must dial it (transport tcp-client). A 34-port probe found only 22 and 5555 open. Platform is QNX (SSH banner OpenSSH_5.2 QNX_Secure_Shell-20090621), so 5555 is the instrument's own service and not Android ADB. Port 80 is refused while its 'Web server' checkbox is unticked. Earlier guesses of port 8085 AND of HL7 were both wrong.",
+      "_protocol": "NOT ASTM and NOT HL7 — do not point an existing parser at this. It is a proprietary line protocol framed with DLE STX (0x10 0x02) … DLE ETX (0x10 0x03). Observed frame, one every 2.00s with a perfectly contiguous counter: '0199FFFF:IC@20260807,090833,AF20095065,21.16X' = 4 hex digits sequence, 4 hex digits address (FFFF broadcast), ':IC@' message class, YYYYMMDD, HHMMSS, device id, value, then one trailing check character. 143 frames captured were all :IC@ with an unchanging payload of 21.16 — a status/temperature heartbeat, not results.",
+      "_confirm": "Result frames have NOT been seen yet, so the message class and field layout a result uses are unknown. Run a test on the instrument while tools/analyzer-dial.mjs is attached, then write the driver against the captured frame. Also note the instrument clock was 235 minutes BEHIND local time, which would misdate every result — fix it on the instrument before go-live."
+    },
+    {
+      "id": "wondfo",
+      "name": "Wondfo Rapid (POCT)",
+      "transport": "tcp-server",
+      "port": 8082,
+      "protocol": "hl7",
+      "_confirm": "COM + Ethernet — prefer Ethernet. Confirm HL7 vs proprietary and connection direction."
+    },
+    {
+      "id": "finecare",
+      "name": "Finecare (Wondfo, POCT)",
+      "transport": "tcp-server",
+      "port": 8083,
+      "protocol": "hl7",
+      "_confirm": "USB/Ethernet/COM available — prefer Ethernet. Confirm HL7 mapping + direction."
+    },
+    {
+      "id": "weldonwb150",
+      "name": "Weldon Biotech WB-150 (Biochemistry)",
+      "transport": "tcp-server",
+      "port": 8084,
+      "protocol": "astm",
+      "_confirm": "Ethernet. Confirm connection direction (server/client) + protocol."
+    },
+    {
+      "id": "qualcyte10",
+      "name": "Qualcyte 10",
+      "transport": "manual",
+      "protocol": "none",
+      "enabled": false,
+      "_confirm": "Has ONLY power + HDMI printer output — no data interface. Cannot auto-integrate; results must be entered manually (or via a printer-capture add-on later)."
+    }
+  ]
+}

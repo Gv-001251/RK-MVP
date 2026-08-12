@@ -58,19 +58,7 @@ export default function OpdPanel({ onPrintPrescription, onNavigateToTab }) {
       };
     });
 
-    const mockAdditions = [
-      { token: '104', patientId: 'PAT-000003', patientName: 'Fayruz Husniya', age: 42, gender: 'Female', phone: '7200177890', visitType: 'OPD', status: 'Waiting', doctorAssigned: 'Dr. Abdul Kareem', date: '17/06/2026' },
-      { token: '105', patientId: 'PAT-000005', patientName: 'Aaliyah Bin Salih', age: 20, gender: 'Female', phone: '9840123456', visitType: 'Emergency', status: 'Completed', doctorAssigned: 'Dr. Abdul Kareem', date: '17/06/2026' }
-    ];
-
-    const all = [...baseQueue];
-    mockAdditions.forEach(mock => {
-      if (!all.some(a => a.token === mock.token)) {
-        all.push(mock);
-      }
-    });
-
-    return all.sort((a, b) => parseInt(a.token) - parseInt(b.token));
+    return baseQueue.sort((a, b) => parseInt(a.token) - parseInt(b.token));
   };
 
   const tokenQueue = getFullTokenQueue();

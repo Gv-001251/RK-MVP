@@ -13,7 +13,9 @@ export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, on
     currency,
     activeRole,
     nursingNotes,
-    labRequests
+    labRequests,
+    labTasks,
+    labOrders
   } = useClinic();
 
   const [docPerfData, setDocPerfData] = useState([]);
@@ -134,6 +136,18 @@ export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, on
   const samplesCollectedToday = 92 + (labRequests ? labRequests.filter(r => ['Collected', 'Processing', 'Pending Verification', 'Verified'].includes(r.status)).length - 4 : 0);
   const samplesProcessingToday = 35 + (labRequests ? labRequests.filter(r => r.status === 'Processing').length - 1 : 0);
   const samplesCompletedToday = 78 + (labRequests ? labRequests.filter(r => r.status === 'Verified').length - 1 : 0);
+
+  // Redesigned dashboard variables (From image)
+  const pending = labTasks ? labTasks.filter(t => t.status === 'Sample Collected').length : 5;
+  const sampleCollection = labTasks ? labTasks.filter(t => t.status === 'Sample Registered').length : 6;
+  const processing = labTasks ? labTasks.filter(t => ['Processing', 'Analyzer Running'].includes(t.status)).length : 8;
+  const completed = labTasks ? labTasks.filter(t => t.status === 'Verified').length : 6;
+  const delivered = labTasks ? labTasks.filter(t => t.status === 'Delivered').length : 15;
+  const totalReports = pending + sampleCollection + processing + completed + delivered;
+
+  const cabin = 2;
+  const bed = 3;
+  const totalBeds = cabin + bed;
 
   // Format currency value helper
   const formatVal = (val) => {
@@ -442,204 +456,139 @@ export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, on
         return (
           <>
             {/* Card 1: Patients Today */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#3b82f6' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span className="erp-card-header-title">Total Patients Today</span>
-              </div>
-              <span className="erp-card-large-number">{totalPatientsToday}</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Admission</span>
-                  <span className="erp-card-detail-value">{patientAdmission}</span>
+            <div className="erp-dashboard-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '190px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.03)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', textAlign: 'center', color: '#475569', margin: 0 }}>Patients Today</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '42px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>{patientAdmission.toString().padStart(2, '0')}</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>Patient Admission</span>
                 </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Under Treatment</span>
-                  <span className="erp-card-detail-value">{underTreatment}</span>
-                </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">New Patients</span>
-                  <span className="erp-card-detail-value">{newPatients}</span>
-                </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Discharged</span>
-                  <span className="erp-card-detail-value">{dischargedPatients}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '150px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569', borderBottom: '1px dashed rgba(0,0,0,0.06)', paddingBottom: '4px' }}>
+                    <span>Patient Under Treatment</span>
+                    <span style={{ color: '#0f172a' }}>{underTreatment.toString().padStart(2, '0')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                    <span>Patient Discharge</span>
+                    <span style={{ color: '#0f172a' }}>{dischargedPatients.toString().padStart(2, '0')}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: OPD Count */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#a855f7' }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                <span className="erp-card-header-title">OPD Count</span>
-              </div>
-              <span className="erp-card-large-number">{totalOpdToday}</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Completed</span>
-                  <span className="erp-card-detail-value">{opdCompleted}</span>
+            {/* Card 2: Expense Today */}
+            <div className="erp-dashboard-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '190px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.03)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', textAlign: 'center', color: '#475569', margin: 0 }}>Expense Today</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr', alignItems: 'center', marginTop: '10px', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>4270.00</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>Expense</span>
                 </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Waiting</span>
-                  <span className="erp-card-detail-value">{opdWaiting}</span>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <svg width="50" height="24" viewBox="0 0 50 24" style={{ overflow: 'visible' }}>
+                    <path d="M0,18 Q12.5,2 25,14 T50,8" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d="M0,18 Q12.5,2 25,14 T50,8 L50,24 L0,24 Z" fill="rgba(239, 68, 68, 0.08)" />
+                  </svg>
                 </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Consulting</span>
-                  <span className="erp-card-detail-value">{opdInConsultation}</span>
-                </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Cancelled</span>
-                  <span className="erp-card-detail-value">{opdCancelled.toString().padStart(2, '0')}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>80430.00</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>This Month</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 3: IPD Count */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#10b981' }}><path d="M2 4v16M2 14h20M22 14v6M2 18h20M10 8H5v6h5V8z"/></svg>
-                <span className="erp-card-header-title">IPD Count</span>
-              </div>
-              <span className="erp-card-large-number">{totalIpdToday}</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Admitted</span>
-                  <span className="erp-card-detail-value">{ipdAdmitted}</span>
+            {/* Card 3: Collection Today */}
+            <div className="erp-dashboard-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '190px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.03)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', textAlign: 'center', color: '#475569', margin: 0 }}>Collection Today</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '130px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569', borderBottom: '1px dashed rgba(0,0,0,0.06)', paddingBottom: '4px' }}>
+                    <span>Clinic</span>
+                    <span style={{ color: '#0f172a' }}>6200.00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                    <span>Lab</span>
+                    <span style={{ color: '#0f172a' }}>4500.00</span>
+                  </div>
                 </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label">Discharged</span>
-                  <span className="erp-card-detail-value">{ipdDischarged.toString().padStart(2, '0')}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 4: Emergency Cases */}
-            <div className="erp-dashboard-card" style={{ padding: '16px', border: '1.5px solid rgba(239, 68, 68, 0.25)' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#ef4444' }}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                <span className="erp-card-header-title" style={{ color: '#ef4444' }}>Emergency Cases</span>
-              </div>
-              <span className="erp-card-large-number" style={{ color: '#ef4444' }}>4</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">Critical Status</span>
-                  <span className="erp-card-detail-value" style={{ color: '#ef4444' }}>Immediate Attention Required</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>10700.00</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>Total</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 5: Laboratory Revenue */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#059669' }}><path d="M6 3h12M12 3v7M9 12h6M5 21h14M19 21l-7-11L5 21z"/></svg>
-                <span className="erp-card-header-title">Laboratory Revenue</span>
-              </div>
-              <span className="erp-card-large-number" style={{ fontSize: '20px', paddingTop: '8px', paddingBottom: '8px' }}>
-                {formatVal(revenueLaboratory)}
-              </span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">LIS Automation Billing</span>
-                  <span className="erp-card-detail-value">Diagnostic Scans Included</span>
+            {/* Card 4: Due (Not Collected) */}
+            <div className="erp-dashboard-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '190px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.03)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', textAlign: 'center', color: '#475569', margin: 0 }}>Due (Not Collected)</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '130px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569', borderBottom: '1px dashed rgba(0,0,0,0.06)', paddingBottom: '4px' }}>
+                    <span>Clinic</span>
+                    <span style={{ color: '#0f172a' }}>60200.00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                    <span>Lab</span>
+                    <span style={{ color: '#0f172a' }}>72910.00</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>133110.00</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>Total</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 6: Pharmacy Revenue */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#e11d48' }}><ellipse cx="12" cy="10" rx="7" ry="6"/><path d="M12 4v12"/></svg>
-                <span className="erp-card-header-title">Pharmacy Revenue</span>
-              </div>
-              <span className="erp-card-large-number" style={{ fontSize: '20px', paddingTop: '8px', paddingBottom: '8px' }}>
-                {formatVal(revenuePharmacy)}
-              </span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">Dispensed Today</span>
-                  <span className="erp-card-detail-value">Counter Sales Included</span>
+            {/* Card 5: Lab Reports Today */}
+            <div className="erp-dashboard-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '190px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.03)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', textAlign: 'center', color: '#475569', margin: 0 }}>Lab Reports Today</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px', fontSize: '11px', fontWeight: '700', color: '#475569' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(0,0,0,0.04)' }}>
+                    <span>Pending</span>
+                    <span>{pending.toString().padStart(2, '0')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(0,0,0,0.04)' }}>
+                    <span>Sample collection</span>
+                    <span>{sampleCollection.toString().padStart(2, '0')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(0,0,0,0.04)' }}>
+                    <span>Processing</span>
+                    <span>{processing.toString().padStart(2, '0')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(0,0,0,0.04)' }}>
+                    <span>Completed</span>
+                    <span>{completed.toString().padStart(2, '0')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Delivered</span>
+                    <span>{delivered.toString().padStart(2, '0')}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '42px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>{totalReports}</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>Total</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 7: Billing Revenue */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#f59e0b' }}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                <span className="erp-card-header-title">Billing Revenue</span>
-              </div>
-              <span className="erp-card-large-number" style={{ fontSize: '20px', paddingTop: '8px', paddingBottom: '8px' }}>
-                {formatVal(revenueTotal)}
-              </span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">OPD + IPD + Pharmacy</span>
-                  <span className="erp-card-detail-value">Total Realized Revenue</span>
+            {/* Card 6: Available Bed */}
+            <div className="erp-dashboard-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '190px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.03)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', textAlign: 'center', color: '#475569', margin: 0 }}>Available Bed</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '120px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569', borderBottom: '1px dashed rgba(0,0,0,0.06)', paddingBottom: '4px' }}>
+                    <span>Cabin</span>
+                    <span style={{ color: '#0f172a' }}>{cabin.toString().padStart(2, '0')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                    <span>Bed</span>
+                    <span style={{ color: '#0f172a' }}>{bed.toString().padStart(2, '0')}</span>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Card 8: Occupied Beds */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#0f766e' }}><path d="M2 4v16M2 14h20M22 14v6"/></svg>
-                <span className="erp-card-header-title">Occupied Beds</span>
-              </div>
-              <span className="erp-card-large-number">{ipdOccupiedBeds}</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">Inpatient Census</span>
-                  <span className="erp-card-detail-value">Occupancy Rate: {((ipdOccupiedBeds / totalBedsCount) * 100).toFixed(1)}%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 9: Available Beds */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#0d9488' }}><path d="M2 4v16M2 14h20M22 14v6M2 18h20"/></svg>
-                <span className="erp-card-header-title">Available Beds</span>
-              </div>
-              <span className="erp-card-large-number">{ipdAvailableBeds}</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">Total Bed Stock: {totalBedsCount}</span>
-                  <span className="erp-card-detail-value">Available for Admissions</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 10: Machine Status */}
-            <div className="erp-dashboard-card" style={{ padding: '16px' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#4b5563' }}><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
-                <span className="erp-card-header-title">Machine Status</span>
-              </div>
-              <span className="erp-card-large-number" style={{ fontSize: '20px', paddingTop: '8px', paddingBottom: '8px' }}>7 Online, 1 Maint.</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item" style={{ gridColumn: 'span 2' }}>
-                  <span className="erp-card-detail-label">Laboratory Analyzers</span>
-                  <span className="erp-card-detail-value">ESR under Calibration</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 11: Pending Reports */}
-            <div className="erp-dashboard-card" style={{ padding: '16px', border: '1.5px solid rgba(244, 63, 94, 0.2)' }}>
-              <div className="erp-card-header-flex">
-                <svg viewBox="0 0 24 24" style={{ stroke: '#e11d48' }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span className="erp-card-header-title" style={{ color: '#e11d48' }}>Pending Reports</span>
-              </div>
-              <span className="erp-card-large-number" style={{ color: '#e11d48' }}>12</span>
-              <div className="erp-card-details-grid">
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label" style={{ color: '#b45309' }}>Total Pending</span>
-                  <span className="erp-card-detail-value" style={{ color: '#b45309' }}>12 Reports</span>
-                </div>
-                <div className="erp-card-detail-item">
-                  <span className="erp-card-detail-label" style={{ color: '#b45309' }}>Critical</span>
-                  <span className="erp-card-detail-value" style={{ color: '#b45309' }}>3 Reports</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '42px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>{totalBeds.toString().padStart(2, '0')}</span>
+                  <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '700', marginTop: '6px' }}>Total</span>
                 </div>
               </div>
             </div>
@@ -672,7 +621,10 @@ export default function DashboardPanel({ onOpenPatientProfile, onEditPatient, on
     <div className="content-panel active" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
       {/* Dynamic Cards Grid */}
-      <div className="erp-cards-grid" style={{ padding: '0 0 20px 0' }}>
+      <div className="erp-cards-grid" style={{ 
+        padding: '0 32px 20px 32px', 
+        gridTemplateColumns: activeRole === 'admin' ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'
+      }}>
         {renderDashboardCards()}
       </div>
 

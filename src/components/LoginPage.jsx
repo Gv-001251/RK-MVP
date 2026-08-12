@@ -49,18 +49,6 @@ export default function LoginPage() {
       )
     },
     {
-      id: 'nurse_pharmacy',
-      name: 'Nurse & Pharmacy',
-      userPrefill: 'medic@rkclinic.com',
-      passPrefill: 'medic@123',
-      icon: (
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="9" width="20" height="6" rx="3" transform="rotate(45 12 12)" />
-          <line x1="12" y1="5.5" x2="12" y2="18.5" transform="rotate(45 12 12)" />
-        </svg>
-      )
-    },
-    {
       id: 'technician',
       name: 'Laboratory Technician',
       userPrefill: 'lab@rkclinic.com',
@@ -131,7 +119,7 @@ export default function LoginPage() {
         /* Left Section (50%) */
         .login-left-pane {
           width: 50%;
-          background: linear-gradient(135deg, #f0f7ff 0%, #e0effe 50%, #eff6ff 100%);
+          background: linear-gradient(135deg, #eef0ff 0%, #e4e7ff 45%, #eaf6f4 100%);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -151,14 +139,15 @@ export default function LoginPage() {
         .login-left-logo-icon {
           width: 44px;
           height: 44px;
-          border-radius: 10px;
-          background: #0052cc;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #4338ca 100%);
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
           font-weight: 800;
           font-size: 20px;
+          box-shadow: 0 10px 22px -8px rgba(79, 70, 229, 0.6);
         }
 
         .login-left-branding-text {
@@ -197,14 +186,14 @@ export default function LoginPage() {
         }
 
         .login-left-h1 span {
-          color: #0052cc;
+          color: #4f46e5;
           display: block;
         }
 
         .login-left-h1-underline {
           width: 50px;
           height: 3px;
-          background-color: #0052cc;
+          background-color: #4f46e5;
           margin-top: 12px;
           border-radius: 2px;
         }
@@ -233,7 +222,7 @@ export default function LoginPage() {
         }
 
         .login-feature-icon-wrapper {
-          color: #0052cc;
+          color: #4f46e5;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -259,7 +248,12 @@ export default function LoginPage() {
         }
 
         .login-glass-card {
-          width: 460px;
+          /* max-width, not width: a hard 460px overflows a 390px phone, and
+             because body sets overflow-x: hidden the card is clipped rather than
+             scrollable — the sign-in button ends up off-screen with nothing to
+             indicate it. Capped at 460px, so the desktop layout is unchanged. */
+          width: 100%;
+          max-width: 460px;
           background: #ffffff;
           border: 1px solid #e8eef6;
           border-radius: 20px;
@@ -335,8 +329,8 @@ export default function LoginPage() {
         }
 
         .login-text-input:focus {
-          border-color: #0052cc;
-          box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.08);
+          border-color: #4f46e5;
+          box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.14);
         }
 
         .password-toggle-btn {
@@ -388,6 +382,9 @@ export default function LoginPage() {
           user-select: none;
           text-align: center;
           min-height: 90px;
+          font: inherit;
+          color: inherit;
+          appearance: none;
         }
 
         .login-role-card:hover {
@@ -397,10 +394,10 @@ export default function LoginPage() {
         }
 
         .login-role-card.selected {
-          border-color: #0052cc;
-          background-color: rgba(0, 82, 204, 0.03);
-          color: #0052cc;
-          box-shadow: 0 0 0 1px #0052cc;
+          border-color: #4f46e5;
+          background-color: rgba(79, 70, 229, 0.05);
+          color: #4f46e5;
+          box-shadow: 0 0 0 1px #4f46e5;
         }
 
         .login-role-icon {
@@ -412,7 +409,7 @@ export default function LoginPage() {
         }
 
         .login-role-card.selected .login-role-icon {
-          color: #0052cc;
+          color: #4f46e5;
         }
 
         .login-role-name {
@@ -423,7 +420,7 @@ export default function LoginPage() {
         }
 
         .login-role-card.selected .login-role-name {
-          color: #0052cc;
+          color: #4f46e5;
         }
 
         .login-extra-row {
@@ -445,15 +442,21 @@ export default function LoginPage() {
 
         .login-remember-checkbox {
           cursor: pointer;
-          accent-color: #0052cc;
+          accent-color: #4f46e5;
           width: 16px;
           height: 16px;
         }
 
         .login-forgot-link {
-          color: #0052cc;
+          color: #4f46e5;
           text-decoration: none;
           font-weight: 600;
+          background: none;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: inherit;
         }
 
         .login-forgot-link:hover {
@@ -463,14 +466,15 @@ export default function LoginPage() {
         .login-submit-btn {
           width: 100%;
           height: 48px;
-          border-radius: 8px;
-          background-color: #0052cc;
+          border-radius: 10px;
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #4338ca 100%);
           border: none;
           color: white;
           font-size: 15px;
           font-weight: 600;
           cursor: pointer;
-          transition: background-color 0.2s, transform 0.1s;
+          box-shadow: 0 8px 18px -8px rgba(79, 70, 229, 0.65);
+          transition: filter 0.2s, box-shadow 0.2s, transform 0.1s;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -478,7 +482,8 @@ export default function LoginPage() {
         }
 
         .login-submit-btn:hover {
-          background-color: #0043a4;
+          filter: brightness(1.06);
+          box-shadow: 0 12px 24px -8px rgba(79, 70, 229, 0.6);
         }
 
         .login-submit-btn:active {
@@ -624,6 +629,18 @@ export default function LoginPage() {
           line-height: 1.5;
         }
 
+        /* Phone: reclaim the padding the card spends on decoration, so the form
+           itself gets the width. 36px each side costs a fifth of a 390px screen. */
+        @media (max-width: 480px) {
+          .login-glass-card {
+            padding: 24px 18px;
+            border-radius: 16px;
+          }
+          .login-card-welcome-title {
+            font-size: 22px;
+          }
+        }
+
         /* Responsive Layout */
         @media (max-width: 1024px) {
           .login-left-pane {
@@ -649,54 +666,31 @@ export default function LoginPage() {
           <div className="login-left-branding">
             <div className="login-left-logo-icon">RK</div>
             <div className="login-left-branding-text">
-              <span className="login-left-branding-title">RK CLINIC ERP</span>
-              <span className="login-left-branding-sub">Hospital & Laboratory Management System</span>
+              <span className="login-left-branding-title">RK CLINIC LIS</span>
+              <span className="login-left-branding-sub">Laboratory Workflow &amp; Reporting System</span>
             </div>
           </div>
 
           {/* Left Section Main Content */}
           <div className="login-left-content">
             <h1 className="login-left-h1">
-              Unified Healthcare.
-              <span>Smarter Care.</span>
+              Digital Diagnostics.
+              <span>Faster Reports.</span>
               <div className="login-left-h1-underline"></div>
             </h1>
             
             <p className="login-left-desc">
-              RK Clinic ERP is a unified platform for hospitals and laboratories to manage patients, clinical workflows, laboratory automation, pharmacy, billing and analytics — all in one place.
+              RK Clinic&apos;s Laboratory Workflow &amp; Reporting System connects doctors and the lab in one place — digital test ordering, sample tracking, result entry, verification and instant report delivery, with analyzer integration ready for the future.
             </p>
 
             <div className="login-features-grid">
               <div className="login-feature-item">
                 <span className="login-feature-icon-wrapper">
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                   </svg>
                 </span>
-                <span>Patient Management</span>
-              </div>
-              
-              <div className="login-feature-item">
-                <span className="login-feature-icon-wrapper">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="9" width="20" height="6" rx="3" transform="rotate(45 12 12)" />
-                    <line x1="12" y1="5.5" x2="12" y2="18.5" transform="rotate(45 12 12)" />
-                  </svg>
-                </span>
-                <span>Pharmacy Management</span>
-              </div>
-              
-              <div className="login-feature-item">
-                <span className="login-feature-icon-wrapper">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 4v16M2 14h20M22 14v6M2 18h20" />
-                    <rect x="6" y="8" width="6" height="6" rx="1" />
-                  </svg>
-                </span>
-                <span>OPD, IPD & Emergency</span>
+                <span>Doctor Test Ordering</span>
               </div>
               
               <div className="login-feature-item">
@@ -708,7 +702,30 @@ export default function LoginPage() {
                     <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
                 </span>
-                <span>Billing & Insurance</span>
+                <span>Barcode Sample Tracking</span>
+              </div>
+              
+              <div className="login-feature-item">
+                <span className="login-feature-icon-wrapper">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                </span>
+                <span>Result Entry & Verification</span>
+              </div>
+              
+              <div className="login-feature-item">
+                <span className="login-feature-icon-wrapper">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <path d="M9 15h6M9 18h3" />
+                  </svg>
+                </span>
+                <span>PDF Report Generation</span>
               </div>
               
               <div className="login-feature-item">
@@ -723,55 +740,55 @@ export default function LoginPage() {
               <div className="login-feature-item">
                 <span className="login-feature-icon-wrapper">
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="20" x2="18" y2="10" />
-                    <line x1="12" y1="20" x2="12" y2="4" />
-                    <line x1="6" y1="20" x2="6" y2="14" />
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <path d="M9 9h6v6H9z" />
+                    <path d="M4 12h2M18 12h2M12 4v2M12 18v2" />
                   </svg>
                 </span>
-                <span>Reports & Analytics</span>
+                <span>Analyzer Integration Ready</span>
               </div>
             </div>
           </div>
 
           {/* Hospital Line Art Illustration */}
           <svg className="login-hospital-illustration" viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <line x1="50" y1="180" x2="550" y2="180" stroke="#0052cc" strokeWidth="2" strokeLinecap="round" opacity="0.25" />
-            <circle cx="100" cy="140" r="20" fill="none" stroke="#0052cc" strokeWidth="2" opacity="0.25" />
-            <line x1="100" y1="140" x2="100" y2="180" stroke="#0052cc" strokeWidth="2" opacity="0.25" />
-            <line x1="90" y1="160" x2="100" y2="150" stroke="#0052cc" strokeWidth="2" opacity="0.25" />
+            <line x1="50" y1="180" x2="550" y2="180" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" opacity="0.25" />
+            <circle cx="100" cy="140" r="20" fill="none" stroke="#4f46e5" strokeWidth="2" opacity="0.25" />
+            <line x1="100" y1="140" x2="100" y2="180" stroke="#4f46e5" strokeWidth="2" opacity="0.25" />
+            <line x1="90" y1="160" x2="100" y2="150" stroke="#4f46e5" strokeWidth="2" opacity="0.25" />
             
-            <circle cx="500" cy="140" r="20" fill="none" stroke="#0052cc" strokeWidth="2" opacity="0.25" />
-            <line x1="500" y1="140" x2="500" y2="180" stroke="#0052cc" strokeWidth="2" opacity="0.25" />
-            <line x1="510" y1="160" x2="500" y2="150" stroke="#0052cc" strokeWidth="2" opacity="0.25" />
+            <circle cx="500" cy="140" r="20" fill="none" stroke="#4f46e5" strokeWidth="2" opacity="0.25" />
+            <line x1="500" y1="140" x2="500" y2="180" stroke="#4f46e5" strokeWidth="2" opacity="0.25" />
+            <line x1="510" y1="160" x2="500" y2="150" stroke="#4f46e5" strokeWidth="2" opacity="0.25" />
             
-            <rect x="250" y="50" width="100" height="130" rx="4" fill="none" stroke="#0052cc" strokeWidth="2" opacity="0.3" />
-            <rect x="180" y="80" width="70" height="100" rx="4" fill="none" stroke="#0052cc" strokeWidth="2" opacity="0.3" />
-            <rect x="350" y="80" width="70" height="100" rx="4" fill="none" stroke="#0052cc" strokeWidth="2" opacity="0.3" />
+            <rect x="250" y="50" width="100" height="130" rx="4" fill="none" stroke="#4f46e5" strokeWidth="2" opacity="0.3" />
+            <rect x="180" y="80" width="70" height="100" rx="4" fill="none" stroke="#4f46e5" strokeWidth="2" opacity="0.3" />
+            <rect x="350" y="80" width="70" height="100" rx="4" fill="none" stroke="#4f46e5" strokeWidth="2" opacity="0.3" />
             
-            <rect x="270" y="70" width="15" height="15" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="315" y="70" width="15" height="15" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="270" y="100" width="15" height="15" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="315" y="100" width="15" height="15" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
+            <rect x="270" y="70" width="15" height="15" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="315" y="70" width="15" height="15" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="270" y="100" width="15" height="15" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="315" y="100" width="15" height="15" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
             
-            <rect x="200" y="100" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="225" y="100" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="200" y="130" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="225" y="130" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
+            <rect x="200" y="100" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="225" y="100" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="200" y="130" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="225" y="130" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
             
-            <rect x="370" y="100" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="395" y="100" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="370" y="130" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
-            <rect x="395" y="130" width="12" height="12" rx="2" fill="none" stroke="#0052cc" strokeWidth="1.5" opacity="0.4" />
+            <rect x="370" y="100" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="395" y="100" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="370" y="130" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
+            <rect x="395" y="130" width="12" height="12" rx="2" fill="none" stroke="#4f46e5" strokeWidth="1.5" opacity="0.4" />
             
-            <path d="M285 180 V150 H315 V180" stroke="#0052cc" strokeWidth="2" opacity="0.4" />
+            <path d="M285 180 V150 H315 V180" stroke="#4f46e5" strokeWidth="2" opacity="0.4" />
             
-            <path d="M292 25 H308 M300 17 V33" stroke="#0052cc" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
-            <circle cx="300" cy="25" r="14" fill="none" stroke="#0052cc" strokeWidth="2" opacity="0.4" />
+            <path d="M292 25 H308 M300 17 V33" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+            <circle cx="300" cy="25" r="14" fill="none" stroke="#4f46e5" strokeWidth="2" opacity="0.4" />
             
-            <path d="M70 60 H80 M75 55 V65" stroke="#0052cc" strokeWidth="1.5" opacity="0.2" />
-            <path d="M120 30 H128 M124 26 V34" stroke="#0052cc" strokeWidth="1.5" opacity="0.2" />
-            <path d="M480 50 H490 M485 45 V55" stroke="#0052cc" strokeWidth="1.5" opacity="0.2" />
-            <path d="M530 80 H538 M534 76 V84" stroke="#0052cc" strokeWidth="1.5" opacity="0.2" />
+            <path d="M70 60 H80 M75 55 V65" stroke="#4f46e5" strokeWidth="1.5" opacity="0.2" />
+            <path d="M120 30 H128 M124 26 V34" stroke="#4f46e5" strokeWidth="1.5" opacity="0.2" />
+            <path d="M480 50 H490 M485 45 V55" stroke="#4f46e5" strokeWidth="1.5" opacity="0.2" />
+            <path d="M530 80 H538 M534 76 V84" stroke="#4f46e5" strokeWidth="1.5" opacity="0.2" />
           </svg>
 
         </div>
@@ -811,7 +828,7 @@ export default function LoginPage() {
               ) : (
                 <form className="login-form" onSubmit={handleForgotPasswordSubmit}>
                   <div className="login-input-group">
-                    <label className="login-input-label">Email Address</label>
+                    <label className="login-input-label" htmlFor="reset-email">Email Address</label>
                     <div className="login-input-wrapper">
                       <span className="login-input-icon">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
@@ -821,10 +838,12 @@ export default function LoginPage() {
                       </span>
                       <input 
                         type="email" 
+                        id="reset-email"
                         className="login-text-input"
                         placeholder="Enter your email"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
+                        autoComplete="email"
                         required
                       />
                     </div>
@@ -835,17 +854,16 @@ export default function LoginPage() {
                   </button>
 
                   <div style={{ textAlign: 'center', marginTop: '12px' }}>
-                    <a 
-                      href="#back-to-login" 
+                    <button 
+                      type="button"
                       className="login-forgot-link"
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         setIsForgotPassword(false);
                         setErrorMsg('');
                       }}
                     >
                       Back to Sign In
-                    </a>
+                    </button>
                   </div>
                 </form>
               )}
@@ -856,7 +874,7 @@ export default function LoginPage() {
               
               <div className="login-card-header">
                 <h2 className="login-card-welcome-title">Welcome Back</h2>
-                <p className="login-card-subtitle">Sign in to access RK Clinic ERP</p>
+                <p className="login-card-subtitle">Sign in to access RK Clinic Laboratory</p>
               </div>
 
               {errorMsg && (
@@ -869,7 +887,7 @@ export default function LoginPage() {
                 
                 {/* Username Input */}
                 <div className="login-input-group">
-                  <label className="login-input-label">Email / Username</label>
+                  <label className="login-input-label" htmlFor="login-username">Email / Username</label>
                   <div className="login-input-wrapper">
                     <span className="login-input-icon">
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
@@ -879,10 +897,12 @@ export default function LoginPage() {
                     </span>
                     <input 
                       type="text" 
+                      id="login-username"
                       className="login-text-input"
                       placeholder="Enter your email"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
+                      autoComplete="username"
                       required
                     />
                   </div>
@@ -890,7 +910,7 @@ export default function LoginPage() {
 
                 {/* Password Input */}
                 <div className="login-input-group">
-                  <label className="login-input-label">Password</label>
+                  <label className="login-input-label" htmlFor="login-password">Password</label>
                   <div className="login-input-wrapper">
                     <span className="login-input-icon">
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
@@ -900,16 +920,20 @@ export default function LoginPage() {
                     </span>
                     <input 
                       type={showPassword ? "text" : "password"} 
+                      id="login-password"
                       className="login-text-input"
                       placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
                       required
                     />
                     <button 
                       type="button" 
                       className="password-toggle-btn"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
                     >
                       {showPassword ? (
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
@@ -930,14 +954,17 @@ export default function LoginPage() {
                 <div className="login-roles-header">Select Your Role</div>
                 <div className="login-roles-grid">
                   {roles.map(r => (
-                    <div 
+                    <button 
+                      type="button"
                       key={r.id}
                       className={`login-role-card ${selectedRole === r.id ? 'selected' : ''}`}
                       onClick={() => handleRoleSelect(r.id)}
+                      aria-pressed={selectedRole === r.id}
+                      aria-label={`Select role: ${r.name}`}
                     >
-                      <span className="login-role-icon">{r.icon}</span>
+                      <span className="login-role-icon" aria-hidden="true">{r.icon}</span>
                       <span className="login-role-name">{r.name}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -953,17 +980,16 @@ export default function LoginPage() {
                     <span>Remember Me</span>
                   </label>
                   
-                  <a 
-                    href="#forgot" 
+                  <button 
+                    type="button"
                     className="login-forgot-link"
-                    onClick={(e) => {
-                      e.preventDefault();
+                    onClick={() => {
                       setIsForgotPassword(true);
                       setResetEmail(username);
                     }}
                   >
                     Forgot Password?
-                  </a>
+                  </button>
                 </div>
 
                 {/* Sign In button */}
@@ -985,11 +1011,11 @@ export default function LoginPage() {
               <div className="login-status-checklist">
                 <div className="login-status-item">
                   <span className="login-status-dot"></span>
-                  <span>HMS Services Online</span>
+                  <span>LIS Services Online</span>
                 </div>
                 <div className="login-status-item">
                   <span className="login-status-dot"></span>
-                  <span>LIS Services Online</span>
+                  <span>Analyzer Link Ready</span>
                 </div>
                 <div className="login-status-item">
                   <span className="login-status-dot"></span>
@@ -999,7 +1025,7 @@ export default function LoginPage() {
 
               {/* Footer info */}
               <div className="login-footer">
-                Version 1.0.0 | Powered by RK Clinic ERP
+                Version 1.0.0 | Powered by RK Clinic LIS
               </div>
 
             </div>
@@ -1013,14 +1039,14 @@ export default function LoginPage() {
       <div className="login-footer-bar">
         <div className="login-footer-left">
           <div className="login-footer-icon-wrapper">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0052cc" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <polyline points="9 11 11 13 15 9" />
             </svg>
           </div>
           <div className="login-footer-text-wrapper">
             <span className="login-footer-text-bold">Secure. Reliable. Integrated.</span>
-            <span className="login-footer-text-sub">Your trusted partner in healthcare management.</span>
+            <span className="login-footer-text-sub">Your trusted partner in laboratory diagnostics.</span>
           </div>
         </div>
       </div>
