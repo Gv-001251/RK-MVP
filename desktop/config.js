@@ -59,7 +59,29 @@ function loadDotEnv(appRoot) {
  * @returns {string[]} missing keys, empty when the config is usable
  */
 function missingConfig(env) {
-  return ['MYSQL_DATABASE', 'LIS_ANALYZER_API_KEY'].filter((key) => !env[key]);
+  const problems = ['MYSQL_DATABASE', 'LIS_ANALYZER_API_KEY'].filter((key) => !env[key]);
+
+  // JWT_SECRET is checked for strength, not just presence, because the server
+  // refuses to boot without a strong one — src/lib/auth-config.js throws in
+  // production, middleware evaluates it at module scope, and the result is
+  // "Internal Server Error" on EVERY route including the login page. Nothing on
+  // screen suggests a configuration problem.
+  //
+  // These rules deliberately mirror resolveJwtSecret(). If they drift, this
+  // dialog will pass an install that the server then rejects, which is the worst
+  // of both worlds.
+  const secret = env.JWT_SECRET;
+  const placeholder = /^(your[_-]|change[_-]?me|replace[_-]|secret$|test$)/i;
+
+  if (!secret || secret === 'dev_secret_change_me') {
+    problems.push('JWT_SECRET (not set)');
+  } else if (placeholder.test(secret)) {
+    problems.push('JWT_SECRET (still a placeholder)');
+  } else if (secret.length < 32) {
+    problems.push(`JWT_SECRET (too short: ${secret.length} chars, needs 32+)`);
+  }
+
+  return problems;
 }
 
 function loadSettings() {

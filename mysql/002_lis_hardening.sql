@@ -15,12 +15,40 @@
 USE rk_clinic;
 
 -- ── lab_tasks: add missing workflow columns ────────────────────────────────
--- These are written by the workflow engine but were absent from the schema.
--- (Remove any that already exist in your DB before running.)
-ALTER TABLE lab_tasks
-  ADD COLUMN registered_at       DATETIME NULL AFTER remarks,
-  ADD COLUMN analyzer_started_at DATETIME NULL AFTER registered_at,
-  ADD COLUMN qc_started_at       DATETIME NULL AFTER analyzer_started_at;
+-- These are written by the workflow engine but were absent from the original
+-- schema. 001 has since been updated to define them, so on a FRESH database they
+-- already exist and a plain ADD COLUMN fails with "Duplicate column name" —
+-- which meant this file, and therefore `npm run db:migrate`, could not build a
+-- new database at all. It only ever worked on the one database it was written to
+-- repair.
+--
+-- MySQL 8 has no ADD COLUMN IF NOT EXISTS (it was removed), so each column is
+-- guarded by an information_schema lookup and applied through dynamic SQL.
+-- Verbose, but it makes the file replayable, which is the whole point of a
+-- migration.
+SET @add_registered_at = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_tasks'
+       AND COLUMN_NAME = 'registered_at') = 0,
+  'ALTER TABLE lab_tasks ADD COLUMN registered_at DATETIME NULL AFTER remarks',
+  'DO 0');
+PREPARE stmt FROM @add_registered_at; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @add_analyzer_started_at = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_tasks'
+       AND COLUMN_NAME = 'analyzer_started_at') = 0,
+  'ALTER TABLE lab_tasks ADD COLUMN analyzer_started_at DATETIME NULL AFTER registered_at',
+  'DO 0');
+PREPARE stmt FROM @add_analyzer_started_at; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @add_qc_started_at = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_tasks'
+       AND COLUMN_NAME = 'qc_started_at') = 0,
+  'ALTER TABLE lab_tasks ADD COLUMN qc_started_at DATETIME NULL AFTER analyzer_started_at',
+  'DO 0');
+PREPARE stmt FROM @add_qc_started_at; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ── lab_tasks: convert existing timestamp columns ──────────────────────────
 UPDATE lab_tasks SET verified_at = NULL, report_generated_at = NULL, report_delivered_at = NULL;

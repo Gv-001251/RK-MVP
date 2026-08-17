@@ -109,10 +109,22 @@ if (SITE_DIR) {
     name: 'rk-lis-installer-share',
     private: true,
     version,
-    dependencies: { '@vercel/blob': '^2.0.0' },
+    dependencies: { '@vercel/blob': '^2.8.0' },
   }, null, 2)}\n`);
 
   fs.writeFileSync(path.join(dir, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+
+  // `vercel env pull` writes credentials straight into this directory, and the
+  // .gitignore the CLI leaves behind only covers .vercel — so a pulled OIDC token
+  // or blob read-write token is one `git add .` away from the repository. Ignoring
+  // env files here is the difference between a mistake and a leaked credential.
+  fs.writeFileSync(path.join(dir, '.gitignore'), [
+    '.vercel',
+    '.env',
+    '.env.*',
+    'node_modules',
+    '',
+  ].join('\n'));
   fs.writeFileSync(path.join(dir, 'vercel.json'), `${JSON.stringify({
     $schema: 'https://openapi.vercel.sh/vercel.json',
     // Explicitly NOT a framework project: plain functions and static files.
@@ -317,7 +329,14 @@ function page({ installer, version, sizeMb, sha256, builtAt, hasSetup, downloadU
         <strong>${installer}</strong><br>
         ${sizeMb}&nbsp;MB &middot; Windows 10/11, 64-bit
       </div>
-      <a class="btn" href="${enc}" download>Download installer</a>
+      <!-- No "download" attribute on purpose. This href goes through
+           /api/download, which either redirects to a presigned URL or returns an
+           error page. The attribute tells the browser to SAVE the response
+           whatever it is, so an error page lands on disk as a mystery .html file
+           and the reason never reaches the screen. Without it a failure renders,
+           and a success still downloads because the redirect target serves the
+           installer as a binary attachment. -->
+      <a class="btn" href="${enc}">Download installer</a>
     </div>
     ${hasSetup ? `<div class="dl" style="margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
       <div class="dl-meta"><strong>setup-windows.ps1</strong><br>Run once after installing</div>
@@ -568,17 +587,31 @@ module.exports = async (req, res) => {
   try {
     const blob = require('@vercel/blob');
 
-    if (typeof blob.presignUrl === 'function') {
-      const signed = await blob.presignUrl({
+    if (typeof blob.issueSignedToken === 'function' && typeof blob.presignUrl === 'function') {
+      // TWO steps, not one. issueSignedToken asks the Blob API for a delegation
+      // scoped to this pathname and operation; presignUrl then signs a concrete
+      // URL with it locally. presignUrl on its own cannot work — it has no
+      // credentials and errors with "clientSigningToken and delegationToken from
+      // issueSignedToken are required", which is exactly what an earlier revision
+      // of this file produced.
+      const validUntil = Date.now() + 10 * 60 * 1000;
+
+      const delegation = await blob.issueSignedToken({
+        pathname,
+        operations: ['get'],
+        validUntil,
+      });
+
+      const { presignedUrl } = await blob.presignUrl(delegation, {
+        operation: 'get',
         pathname,
         access: 'private',
-        operation: 'get',
-        expiresIn: 600,
+        validUntil,
       });
-      const url = typeof signed === 'string' ? signed : signed.url;
+
       res.statusCode = 302;
       res.setHeader('cache-control', 'private, no-store');
-      res.setHeader('location', url);
+      res.setHeader('location', presignedUrl);
       res.end();
       return;
     }
@@ -594,11 +627,53 @@ module.exports = async (req, res) => {
     const { Readable } = require('node:stream');
     Readable.fromWeb(result.stream).pipe(res);
   } catch (err) {
-    res.statusCode = 500;
-    res.setHeader('content-type', 'text/plain');
-    res.end('Could not produce a download link: ' + err.message);
+    // Deliberately HTML, not text/plain.
+    //
+    // A text/plain error from a route the browser is treating as a download gets
+    // SAVED as a file — it lands in the downloads list as "download.txt" with a
+    // generic "site wasn't available", and the actual reason is hidden inside a
+    // file nobody thinks to open. An HTML response renders in the tab where the
+    // person can read it.
+    const missing = /not found|no such|404/i.test(err.message || '');
+    res.statusCode = missing ? 503 : 500;
+    res.setHeader('content-type', 'text/html; charset=utf-8');
+    res.setHeader('cache-control', 'private, no-store');
+    res.end(errorHtml(
+      missing ? 'The installer has not been uploaded yet' : 'Could not produce a download link',
+      missing
+        ? 'The download page is live, but the installer for this version is not in storage yet. '
+          + 'Whoever published this build needs to upload it before the download will work.'
+        : 'The server could not reach the file store. This is usually a missing store '
+          + 'connection or credentials on the project, not a problem with your browser.',
+      err.message
+    ));
   }
 };
+
+/** A readable failure page, so the reason is on screen rather than in a saved file. */
+function errorHtml(heading, explanation, detail) {
+  return [
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<title>' + heading + '</title><style>',
+    'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;',
+    'padding:24px;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
+    'color:#17181c;background:#f4f5f7}',
+    '.card{background:#fff;border:1px solid #e6e8ee;border-radius:14px;padding:26px;max-width:460px}',
+    'h1{font-size:18px;margin:0 0 10px}',
+    'p{color:#4b5563;margin:0 0 14px}',
+    'code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#8b93a1;',
+    'background:#f7f8fa;border:1px solid #e6e8ee;border-radius:8px;padding:8px 10px;display:block;',
+    'word-break:break-all}',
+    'a{color:#5c7cf5;text-decoration:none;font-weight:650}',
+    '</style></head><body><div class="card">',
+    '<h1>' + heading + '</h1>',
+    '<p>' + explanation + '</p>',
+    '<code>' + String(detail || '').replace(/[<>&]/g, '') + '</code>',
+    '<p style="margin:16px 0 0"><a href="/">Back to the download page</a></p>',
+    '</div></body></html>',
+  ].join('');
+}
 `;
 }
 

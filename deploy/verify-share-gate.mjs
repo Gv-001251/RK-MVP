@@ -89,7 +89,7 @@ res = await fetch(`${base}/api/download`, { redirect: 'manual' });
 check('download refuses anonymous', res.status === 303 && (res.headers.get('location') || '').includes('auth'));
 
 res = await fetch(`${base}/api/download`, { headers: { cookie }, redirect: 'manual' });
-const ok = res.status === 302 || res.status === 200 || res.status === 500;
+const ok = [200, 302, 500, 503].includes(res.status);
 check('download accepts a session', ok, `status ${res.status} (500 expected here: no blob store locally)`);
 
 server.close();
