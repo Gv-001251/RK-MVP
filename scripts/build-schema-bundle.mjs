@@ -92,16 +92,36 @@ parts.push(`-- =================================================================
 -- RK Clinic LIS — complete database setup
 -- Generated ${new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC
 --
--- Run once on the machine that hosts MySQL:
+-- Run once on a machine with a FRESH MySQL, to create the database from nothing:
 --     mysql -u root -p < ${path.basename(OUT)}
 --
--- Safe to re-run: every statement is guarded, and the migration bookkeeping
--- uses INSERT IGNORE. It will not duplicate data or reset passwords.
+-- NOT for an existing database. Use \`npm run db:migrate\` for that — it tracks
+-- what has already been applied. This file replays every migration from the
+-- start, and some of them are not idempotent: index creation collides, and 002
+-- clears timestamp columns before it would fail, which on a populated database
+-- means losing data and then erroring. The guard below refuses to proceed rather
+-- than leaving a half-applied schema behind.
 -- ============================================================================
 
 CREATE DATABASE IF NOT EXISTS \`${DB}\`
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE \`${DB}\`;
+
+-- ── Refuse to run against a database that already has tables ────────────────
+-- MySQL has no ABORT and SIGNAL only works inside stored programs, so the stop is
+-- produced by preparing a statement that references a column name carrying the
+-- explanation. The client halts on the error and prints the message. When the
+-- database is empty the branch is a no-op.
+SET @existing_tables = (
+  SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${DB}'
+    AND table_name <> 'schema_migrations'
+);
+SET @guard = IF(@existing_tables > 0,
+  'SELECT \`STOP: this database already has tables. This file is only for a fresh database. Use npm run db:migrate instead\` FROM information_schema.tables LIMIT 1',
+  'DO 0');
+PREPARE guard_stmt FROM @guard;
+EXECUTE guard_stmt;
+DEALLOCATE PREPARE guard_stmt;
 
 -- The migration runner's bookkeeping table, created up front so the rows at the
 -- end of this file have somewhere to go.

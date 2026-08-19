@@ -11,12 +11,12 @@
       "id": "maglumi800",
       "name": "Snibe Maglumi 800 (Immunoassay)",
       "transport": "serial",
-      "comPort": "/dev/tty.usbserial-MAGLUMI",
       "baud": 9600,
       "protocol": "astm",
       "driver": "tools/maglumi-bridge.mjs",
       "_protocol": "SETTLED FROM THE VENDOR MANUAL 2026-08-08 (Maglumi 800 Operating Instructions, ch.16): ASTM E1394 over RS-232, NOT HL7 — the 'hl7' here was a wrong guess. Note the link layer is Snibe's stripped-down variant, not textbook E1381: a lone STX, no frame number, no checksum, no CR LF after the terminator, and an ACK expected after every control byte INCLUDING the EOT. Record layout also differs from the earlier implementation: sender is field 5 and receiver field 10 (field 4 is a password), so an earlier revision read the password as the sender. tools/maglumi-bridge.mjs speaks both dialects and auto-detects; tests/astm.test.mjs asserts against the manual's literal examples.",
-      "_confirm": "NEVER TESTED AGAINST THE INSTRUMENT. Before go-live: (1) read Baud/Data bits/Stop bits/Parity off the analyzer's [Online] screen — 9600 8N1 here is still a guess; (2) note whether its Protocol is set to 'ASTM (COM)' or 'ASTM (TCP/IP)', because TCP/IP is far less fragile than a USB-serial adapter whose device name changes on every replug; (3) the LIS cable goes to a SPARE COM port on the analyzer's control PC, NOT the RS232 socket on the analyzer itself — that one carries the instrument-to-PC link; (4) PC-to-PC means DTE-to-DTE, so a null-modem crossover is almost certainly required. Analyzer ID and Host ID are set on that same screen and must match MAGLUMI_ASTM_ID / LIS_ASTM_ID."
+      "_confirm": "NEVER TESTED AGAINST THE INSTRUMENT. Before go-live: (1) read Baud/Data bits/Stop bits/Parity off the analyzer's [Online] screen — 9600 8N1 here is still a guess; (2) note whether its Protocol is set to 'ASTM (COM)' or 'ASTM (TCP/IP)', because TCP/IP is far less fragile than a USB-serial adapter whose device name changes on every replug; (3) the LIS cable goes to a SPARE COM port on the analyzer's control PC, NOT the RS232 socket on the analyzer itself — that one carries the instrument-to-PC link; (4) PC-to-PC means DTE-to-DTE, so a null-modem crossover is almost certainly required. Analyzer ID and Host ID are set on that same screen and must match MAGLUMI_ASTM_ID / LIS_ASTM_ID.",
+      "_comPort": "Serial device name is HOST-SPECIFIC. On Windows this is a COM port (COM3, COM7...), on macOS a /dev/tty.* path, and on either it changes when the adapter moves to a different USB socket. The bridge does not need it: resolvePort() enumerates the host's serial devices and picks the single USB-serial candidate. Only set comPort when more than one adapter is plugged in. Find the real name with: npm run analyzer:serial:list"
     },
     {
       "id": "mispaplus",
@@ -41,31 +41,31 @@
       "id": "mbplus",
       "name": "MB+ Electrolyte Analyzer",
       "transport": "serial",
-      "comPort": "/dev/tty.usbserial-MBPLUS",
       "baud": 9600,
       "protocol": "astm",
       "reconnectMs": 5000,
       "watchdogMs": 0,
-      "_confirm": "Use the 'LIS USB' port (USB-serial). Ignore JTAG (debug only). Confirm baud + protocol. reconnectMs = auto-reopen delay if the serial link drops. watchdogMs = restart this driver if it goes silent that long while nominally connected (0/omit = off; only enable for machines that transmit periodically)."
+      "_confirm": "Use the 'LIS USB' port (USB-serial). Ignore JTAG (debug only). Confirm baud + protocol. reconnectMs = auto-reopen delay if the serial link drops. watchdogMs = restart this driver if it goes silent that long while nominally connected (0/omit = off; only enable for machines that transmit periodically).",
+      "_comPort": "Serial device name is HOST-SPECIFIC — COM port on Windows, /dev/tty.* on macOS. Leave unset unless several adapters are present; the bridge auto-discovers a single one. Use the 'LIS USB' port on the instrument, not JTAG."
     },
     {
       "id": "uriplus300",
       "name": "Uri-Plus 300 (Urine, has barcode scanner)",
       "transport": "serial",
-      "comPort": "/dev/tty.PL2303G-USBtoUART1140",
       "baud": 9600,
       "protocol": "astm",
       "_verified": "2026-08-07, read off the instrument's own setup screen: Baud rate 9600 (so the 9600 guess here was right), LIS mode 'H-800', Test Mode 'Slow Mode', SN 20240108110005. Reached through the Prolific USB-RS232 adapter (vid 067b pid 23a3, sn ENAEb148313) which macOS binds with com.prolific.cdc.PLCdcFSDriver 1.4. NOTE the comPort name is the adapter's USB location (…1140) and will change if the adapter moves to a different physical port — check with `npm run analyzer:serial:list` after replugging.",
-      "_confirm": "Protocol UNVERIFIED — 'astm' is still a guess. The instrument's LIS setting reads 'H-800', which is a vendor preset, not a standard, and it is cyclable so other modes exist. Nothing has been captured yet: an ASTM ENQ at all 8 standard baud rates drew no reply and the RS-232 control lines (CTS/DSR/DCD) are all low, which is also consistent with a straight-through cable where a null-modem is needed. Run a strip with a capture attached before writing the driver. Also still open: whether it transmits the specimen barcode from its onboard scanner, which decides if results auto-match to orders."
+      "_confirm": "Protocol UNVERIFIED — 'astm' is still a guess. The instrument's LIS setting reads 'H-800', which is a vendor preset, not a standard, and it is cyclable so other modes exist. Nothing has been captured yet: an ASTM ENQ at all 8 standard baud rates drew no reply and the RS-232 control lines (CTS/DSR/DCD) are all low, which is also consistent with a straight-through cable where a null-modem is needed. Run a strip with a capture attached before writing the driver. Also still open: whether it transmits the specimen barcode from its onboard scanner, which decides if results auto-match to orders.",
+      "_comPort": "Serial device name is HOST-SPECIFIC — COM port on Windows, /dev/tty.* on macOS, and it changes on replug. Verified settings from the instrument's own setup screen: baud 9600, LIS mode 'H-800', Test Mode 'Slow Mode', SN 20240108110005. Reached through a Prolific USB-RS232 adapter (vid 067b pid 23a3)."
     },
     {
       "id": "rapidstar20",
       "name": "Rapid Star 20",
       "transport": "serial",
-      "comPort": "/dev/tty.usbmodem-RAPIDSTAR",
       "baud": 9600,
       "protocol": "astm",
-      "_confirm": "USB (likely USB-CDC serial). Confirm device path + protocol + whether it sends a sample ID."
+      "_confirm": "USB (likely USB-CDC serial). Confirm device path + protocol + whether it sends a sample ID.",
+      "_comPort": "Serial device name is HOST-SPECIFIC — COM port on Windows, /dev/tty.* on macOS. Likely USB-CDC. Confirm protocol and whether it transmits a sample id."
     },
     {
       "id": "afinion2",
