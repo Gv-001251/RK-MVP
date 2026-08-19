@@ -1,6 +1,6 @@
 {
   "name": "rk-clinic",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "RK Clinic LIS — hospital information system with direct analyzer integration",
   "author": "RK Clinic",
@@ -37,7 +37,8 @@
     "analyzer:bridge": "node tools/lis-bridge.mjs",
     "analyzer:replay": "node tools/lis-bridge.mjs --replay",
     "db:setup": "npm run db:migrate && npm run db:seed",
-    "desktop:dist:win": "npm run desktop:build && electron-builder --win --x64"
+    "desktop:dist:win": "npm run desktop:build && npm run desktop:kit && electron-builder --win --x64",
+    "desktop:kit": "node scripts/build-install-kit.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -122,6 +123,12 @@
       "createStartMenuShortcut": true,
       "shortcutName": "RK Clinic LIS"
     },
-    "npmRebuild": false
+    "npmRebuild": false,
+    "extraFiles": [
+      {
+        "from": "install-kit",
+        "to": "."
+      }
+    ]
   }
 }

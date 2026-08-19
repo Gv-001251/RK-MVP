@@ -19,12 +19,15 @@
  *
  * This bundle needs none of them. It carries:
  *
- *   - all 18 migrations, in filename order
+ *   - every migration in mysql/, in filename order
  *   - the schema_migrations rows they would have written, with matching
  *     checksums, so a later `db:migrate` correctly sees them as already applied
  *     rather than trying to run them again
  *   - staff accounts, with bcrypt hashes computed here and freshly generated
  *     passwords printed once to this terminal
+ *   - the least-privilege MySQL account the application connects as, so the app
+ *     never runs as root and the credential setup-windows.ps1 asks for actually
+ *     exists
  *
  * That last point matters beyond convenience. mysql/seed_users.js hardcodes
  * passwords that are committed to the repository, so every install shares
@@ -44,6 +47,10 @@ const flag = (n, d = null) => { const i = args.indexOf(n); return i !== -1 && ar
 const DB = flag('--database', 'rk_clinic');
 const OUT = path.resolve(flag('--out', 'dist-desktop/rk-clinic-schema.sql'));
 const MIGRATIONS = path.resolve('mysql');
+
+// The account the application connects as. Must match MYSQL_USER in .env.local,
+// which setup-windows.ps1 defaults to the same name.
+const APP_USER = flag('--app-user', 'rk_lis');
 
 const log = (m) => console.log(`▸ ${m}`);
 
@@ -184,6 +191,41 @@ parts.push(`\n-- ─────────────────────
 ${inserts.join('\n\n')}
 `);
 
+/* ── The account the application connects as ──────────────────────────────── */
+
+const appPassword = readablePassword(4);
+
+parts.push(`\n-- ─────────────────────────────────────────────────────────────
+-- Application database account
+--
+-- Until this existed, setup-windows.ps1 wrote MYSQL_USER=${APP_USER} into
+-- .env.local while nothing ever created that account, so the pool in
+-- src/lib/mysql/db.js could not connect and every page returned 500 with
+-- nothing obviously wrong on the machine. Creating it here keeps the two halves
+-- of the install in step.
+--
+-- Created for both 'localhost' and '127.0.0.1'. MySQL matches the host of a TCP
+-- connection from 127.0.0.1 to 'localhost' only by reverse DNS, so a server
+-- started with skip_name_resolve=ON would reject a 'localhost'-only account —
+-- an obscure failure that looks identical to a wrong password.
+--
+-- ALTER USER follows CREATE USER IF NOT EXISTS on purpose: IF NOT EXISTS leaves
+-- an existing account's password untouched, which would mean the password
+-- printed by this build silently does not work.
+--
+-- Privileges are DML only. No CREATE, ALTER or DROP, so a compromised web
+-- process cannot reshape or drop the schema — and so schema changes must be
+-- applied as root via \`npm run db:migrate\`, which is the intended path.
+-- ─────────────────────────────────────────────────────────────
+CREATE USER IF NOT EXISTS '${APP_USER}'@'localhost' IDENTIFIED BY ${sqlString(appPassword)};
+CREATE USER IF NOT EXISTS '${APP_USER}'@'127.0.0.1' IDENTIFIED BY ${sqlString(appPassword)};
+ALTER USER '${APP_USER}'@'localhost' IDENTIFIED BY ${sqlString(appPassword)};
+ALTER USER '${APP_USER}'@'127.0.0.1' IDENTIFIED BY ${sqlString(appPassword)};
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB}\`.* TO '${APP_USER}'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB}\`.* TO '${APP_USER}'@'127.0.0.1';
+`);
+
 /* ── Migration bookkeeping ────────────────────────────────────────────────── */
 
 parts.push(`\n-- ─────────────────────────────────────────────────────────────
@@ -213,5 +255,11 @@ for (const c of credentials) {
 }
 console.log('  └────────────────────────────────────────────────────────────────────┘');
 console.log('');
-log('on the clinic machine:');
+console.log('  ┌─ Database account — setup-windows.ps1 will ask for this password ──┐');
+console.log(`  │ user     ${APP_USER}`);
+console.log(`  │ password ${appPassword}`);
+console.log('  └────────────────────────────────────────────────────────────────────┘');
+console.log('');
+log('on the clinic machine, in this order:');
 console.log(`    mysql -u root -p < ${path.basename(OUT)}`);
+console.log('    powershell -ExecutionPolicy Bypass -File setup-windows.ps1 -ServiceUser <account>');

@@ -1,1 +1,1 @@
-8f34a921c4559b4697266cf80f63cc34a1ad1d4074a3e4693cb8328a9568f6ec  RK Clinic LIS Setup 0.3.0.exe
+df1c24b8cd21e6e43dd948faee1dba07087939acb5d23873c7fd4b8c0df14820  RK Clinic LIS Setup 0.3.1.exe

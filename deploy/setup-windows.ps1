@@ -16,9 +16,18 @@
    3. opens the firewall for the LIS and the analyzers, on the Private profile
    4. stops the machine sleeping, which would drop serial handles and listeners
 
- It does NOT install MySQL and does NOT create the schema. MySQL is a separate
- install, and the schema is applied from the developer's machine — deliberately,
- since the migrations are not shipped with the app.
+ It does NOT install MySQL. That is a separate download, and it must be 8.4 LTS
+ rather than 9.x.
+
+ It does NOT create the database either, and the order matters: run the schema
+ file FIRST, as root, then this script.
+
+   mysql -u root -p < "C:\Program Files\RK Clinic LIS\rk-clinic-schema.sql"
+
+ That file ships alongside the app from 0.3.1 onwards. It creates the schema, the
+ staff accounts, and the low-privilege MySQL account the app connects as. This
+ script then reads that account's password straight out of the schema file, so a
+ 23-character credential never has to be retyped.
 
  This script has not been executed on Windows from the build machine, so read it
  before running it and expect to adjust paths if the install location differs.
@@ -41,8 +50,14 @@ param(
   [string]$MysqlUser = 'rk_lis',
   [string]$MysqlDatabase = 'rk_clinic',
 
-  # Prompted for if omitted, so it never has to appear in a command history.
+  # Read from the schema file if omitted, and prompted for only if that fails, so
+  # it never has to appear in a command history.
   [string]$MysqlPassword,
+
+  # The schema file the installer places next to the app. Used to recover the
+  # application account's generated password rather than asking someone to copy
+  # it by hand.
+  [string]$SchemaFile,
 
   [int]$WebPort = 3000,
 
@@ -96,10 +111,75 @@ $dataDir = Join-Path $userProfile 'AppData\Roaming\rk-clinic'
 $envFile = Join-Path $dataDir '.env.local'
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
+if (-not $SchemaFile) {
+  $SchemaFile = Join-Path $InstallDir 'rk-clinic-schema.sql'
+}
+
+# The schema file created this account, so it is also the only place its password
+# is written down. Reading it here beats asking someone to transcribe 23
+# characters from a terminal on another machine.
+if (-not $MysqlPassword -and (Test-Path $SchemaFile)) {
+  $pattern = "CREATE USER IF NOT EXISTS '" + [regex]::Escape($MysqlUser) +
+             "'@'localhost' IDENTIFIED BY '([^']+)'"
+  $found = [regex]::Match((Get-Content -Raw -Path $SchemaFile), $pattern)
+  if ($found.Success) {
+    $MysqlPassword = $found.Groups[1].Value
+    Write-Ok "recovered the '$MysqlUser' password from $(Split-Path -Leaf $SchemaFile)"
+  } else {
+    Write-Warn "no CREATE USER for '$MysqlUser' in $SchemaFile — was the schema built before 0.3.1?"
+  }
+}
+
 if (-not $MysqlPassword) {
   $secure = Read-Host "MySQL password for '$MysqlUser'" -AsSecureString
   $MysqlPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
     [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+}
+
+# ── Prove the database is reachable before writing anything ──────────────────
+# This is the failure that cost the most time on 0.3.0: the config named an
+# account that had never been created, so the pool could not connect and every
+# page returned 500 with nothing on the machine explaining why. Checking it here
+# turns that into one clear message at setup time.
+
+$mysqlExe = (Get-Command mysql.exe -ErrorAction SilentlyContinue).Source
+if (-not $mysqlExe) {
+  $found = Get-ChildItem -Path 'C:\Program Files\MySQL' -Filter mysql.exe `
+    -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($found) { $mysqlExe = $found.FullName }
+}
+
+if ($mysqlExe) {
+  # PowerShell 7.4+ turns a non-zero exit from a native command into a
+  # terminating error while ErrorActionPreference is Stop, which would abort with
+  # a generic message instead of the specific one below. Windows PowerShell 5.1,
+  # which the documented command line uses, has no such variable.
+  if (Test-Path Variable:PSNativeCommandUseErrorActionPreference) {
+    $PSNativeCommandUseErrorActionPreference = $false
+  }
+
+  # Passed by environment, not on the command line, so the password does not
+  # appear in the process list or trigger mysql's own insecure-argument warning.
+  $env:MYSQL_PWD = $MysqlPassword
+  try {
+    $probe = & $mysqlExe "--host=$MysqlHost" "--port=$MysqlPort" "--user=$MysqlUser" `
+      "--database=$MysqlDatabase" '--batch' '--skip-column-names' `
+      '--execute=SELECT COUNT(*) FROM user_profiles' 2>&1
+    $probeFailed = $LASTEXITCODE -ne 0
+  } finally {
+    Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
+  }
+
+  if ($probeFailed) {
+    Write-Warn "could not query '$MysqlDatabase' as '$MysqlUser':"
+    Write-Warn "   $probe"
+    throw ("Stopping before writing a config that cannot work. Apply the schema " +
+           "first, as root:`n    mysql -u root -p < `"$SchemaFile`"")
+  }
+  Write-Ok "database reachable as '$MysqlUser' — $(($probe | Out-String).Trim()) staff account(s) found"
+} else {
+  Write-Warn 'mysql.exe not found, so these credentials were NOT verified.'
+  Write-Warn 'If the LIS returns 500 on every page, this is the first thing to check.'
 }
 
 # 32 bytes of cryptographic randomness, hex encoded. Generated here so that no
@@ -239,18 +319,15 @@ Write-Host @"
      Staff then open https://<this-machine>.<tailnet>.ts.net with a real
      certificate, instead of sending passwords over plain HTTP.
 
-  1. MySQL 8.4 LTS must be installed and running, with a database named
-     '$MysqlDatabase' and the user '$MysqlUser' able to reach it.
+  1. If the schema step was skipped, do it now as root and re-run this script:
+       mysql -u root -p < "$SchemaFile"
+     Then set bind-address=127.0.0.1 in my.ini and restart MySQL, so nothing off
+     this machine can reach the database directly.
 
-  2. Apply the schema from the developer machine:
-       npm run db:migrate
-       npm run db:seed
-     then set bind-address=127.0.0.1 in my.ini and restart MySQL.
-
-  3. Give the analyzer-side network adapter the address 192.168.1.3, so the
+  2. Give the analyzer-side network adapter the address 192.168.1.3, so the
      instruments need no reconfiguring.
 
-  4. Schedule a mysqldump to somewhere off this machine. Every patient record
+  3. Schedule a mysqldump to somewhere off this machine. Every patient record
      lives here and nowhere else.
 
   Then reboot, and check:
