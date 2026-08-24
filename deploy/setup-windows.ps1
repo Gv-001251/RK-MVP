@@ -269,25 +269,45 @@ if (-not $SkipTask) {
   Write-Step 'Background service'
 
   $taskName = 'RK Clinic LIS'
-  if ((Invoke-Native schtasks @('/query', '/tn', $taskName)) -eq 0) {
+
+  # Registered with the ScheduledTasks cmdlets rather than schtasks.exe.
+  # schtasks wants the program path quoted inside its /tr value, because the path
+  # contains spaces, and getting a quoted-inside-quoted argument through
+  # PowerShell's native argument handling intact is unreliable: it arrives split,
+  # and schtasks answers "Invalid argument/option - 'C:\Program'." The cmdlets
+  # take the path as an ordinary string and do their own quoting, so the whole
+  # problem disappears.
+  $action  = New-ScheduledTaskAction -Execute $serviceLauncher
+  $trigger = New-ScheduledTaskTrigger -AtStartup
+
+  # Meant to behave like a service: start on battery, never time out, and come
+  # back if the supervisor dies.
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) `
+    -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+
+  if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
     Write-Warn 'task already exists -- replacing it'
-    Invoke-Native schtasks @('/delete', '/tn', $taskName, '/f') | Out-Null
   }
 
-  # Not $args: that is an automatic variable holding the script's own unbound
-  # arguments, and assigning to it is the kind of thing that works until it
-  # quietly does not.
-  $taskArgs = @('/create', '/tn', $taskName, '/tr', "`"$serviceLauncher`"",
-                '/sc', 'onstart', '/rl', 'highest', '/f', '/ru', $ServiceUser)
-  if ($ServicePassword) { $taskArgs += @('/rp', $ServicePassword) }
-
-  # -Show here, unlike the probes above: if registering the task fails, whatever
-  # schtasks said about why is the most useful thing on the screen.
-  if ((Invoke-Native schtasks $taskArgs -Show) -ne 0) {
-    throw 'schtasks failed to register the service. Its message is above.'
+  if ($ServicePassword) {
+    # A stored password is what lets the task run with nobody logged in.
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+      -Settings $settings -User $ServiceUser -Password $ServicePassword `
+      -RunLevel Highest -Force | Out-Null
+  } else {
+    $principal = New-ScheduledTaskPrincipal -UserId $ServiceUser -RunLevel Highest
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+      -Settings $settings -Principal $principal -Force | Out-Null
   }
 
-  Write-Ok "registered '$taskName' to start at boot as $ServiceUser"
+  # Read it back rather than trusting the call: a task that was not created is
+  # the difference between a machine that comes up after a power cut and one that
+  # does not.
+  $registered = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+  if (-not $registered) { throw "the task '$taskName' is not there after registering it." }
+
+  Write-Ok "registered '$taskName' to start at boot as $ServiceUser (state: $($registered.State))"
   if (-not $ServicePassword) {
     Write-Warn 'no password given, so the task runs only when that user is logged in.'
     Write-Warn 'For an unattended machine, re-run with -ServicePassword.'

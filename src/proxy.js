@@ -1,3 +1,32 @@
+/**
+ * ============================================================================
+ * Edge authentication gate
+ * ============================================================================
+ * This file is `proxy.js`, not `middleware.js`, and the name is load-bearing.
+ *
+ * Next.js 16 deprecated the `middleware` convention and renamed it to `proxy`,
+ * and in doing so changed the runtime: proxy runs on Node.js, middleware ran on
+ * Edge. That difference is why this file was moved.
+ *
+ * As middleware.js, this code was compiled into .next/server/edge/chunks, and
+ * the Edge sandbox is not given the server process's environment. The secret
+ * lookup below survived the build as a genuine runtime read of
+ * process.env.JWT_SECRET -- nothing was inlined, so no secret leaked into the
+ * artifact -- but at runtime that read returned undefined however carefully the
+ * environment had been configured. NODE_ENV, being a build-time constant, was
+ * present, so resolveJwtSecret() saw production with no secret and threw at
+ * module scope. A module that throws while loading takes every route with it,
+ * which is why a correctly installed clinic machine answered 500 even on
+ * /api/health, a route that can only ever return 200 or 503.
+ *
+ * On the Node runtime process.env is the real thing, read per request, so
+ * secrets can be supplied by the operator at install time instead of having to
+ * exist on the machine that compiled the app.
+ *
+ * Do not rename this back to middleware.js.
+ * ============================================================================
+ */
+
 import { jwtVerify } from 'jose';
 import { NextResponse } from 'next/server';
 import { resolveJwtSecret } from '@/lib/auth-config';
@@ -15,7 +44,7 @@ async function getUser(request) {
   }
 }
 
-export async function middleware(request) {
+export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
   // ── All other API routes: require authentication ──────────────────────────
