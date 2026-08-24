@@ -155,14 +155,17 @@
  5. CONFIGURE WINDOWS
 ==============================================================================
 
- Still in the Administrator PowerShell, in the same folder:
+ Still in the Administrator PowerShell. The full path is used deliberately, so
+ this works whatever folder you happen to be in; "-File setup-windows.ps1" only
+ works if you are already inside the install folder, and otherwise fails with
+ "The argument 'setup-windows.ps1' to the -File parameter does not exist".
 
-     powershell -ExecutionPolicy Bypass -File setup-windows.ps1 -ServiceUser $env:USERNAME
+     powershell -ExecutionPolicy Bypass -File "C:\Program Files\RK Clinic LIS\setup-windows.ps1" -ServiceUser $env:USERNAME
 
  $env:USERNAME is the account you are signed in as. To run the LIS as a
  different account, put that name in directly:
 
-     ... -File setup-windows.ps1 -ServiceUser labuser
+     ... -ServiceUser labuser
 
  Never type angle brackets around it. PowerShell reads "<" as redirection and
  refuses the whole line.
@@ -176,7 +179,7 @@
  If this machine must come back up on its own after a power cut, add the
  Windows password for that account:
 
-     ... -File setup-windows.ps1 -ServiceUser $env:USERNAME -ServicePassword "the-windows-password"
+     ... -ServiceUser $env:USERNAME -ServicePassword "the-windows-password"
 
  Without it the LIS only starts once that user logs in. The script warns about
  this rather than failing, so it is easy to miss and tends to surface weeks
