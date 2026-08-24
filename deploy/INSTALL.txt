@@ -53,11 +53,20 @@
  THE ORDER MATTERS
  -----------------
 
- 1. Install MySQL 8.4 and confirm the service is running.
+ 1. Install MySQL 8.4, then confirm the service is running and find out where
+    it landed:
 
       Get-Service MySQL*
+      Get-ChildItem "C:\Program Files\MySQL" -Directory | Select-Object Name
 
- 2. Create the database, as root. This makes the tables, the staff logins, and
+ 2. Put the MySQL tools on PATH for this window. The MSI does not do it, so
+    without this the next step fails with "'mysql' is not recognized". Use the
+    folder name the command above printed:
+
+      $env:Path += ";C:\Program Files\MySQL\MySQL Server 8.4\bin"
+      mysql --version
+
+ 3. Create the database, as root. This makes the tables, the staff logins, and
     the restricted account the app itself connects as.
 
       cd "C:\Program Files\RK Clinic LIS"
@@ -73,19 +82,21 @@
     with "STOP: this database already has tables", the database already exists
     and this file is not the right tool - it only builds a fresh one.
 
- 3. Run the setup script in an Administrator PowerShell. Replace <account> with
-    the Windows user the lab actually signs in as.
+ 4. Run the setup script in an Administrator PowerShell. $env:USERNAME is the
+    account you are signed in as; to run the LIS as a different user put that
+    name in directly, for example -ServiceUser labuser. Never type angle
+    brackets: PowerShell reads '<' as redirection and refuses the line.
 
-      powershell -ExecutionPolicy Bypass -File setup-windows.ps1 -ServiceUser <account>
+      powershell -ExecutionPolicy Bypass -File setup-windows.ps1 -ServiceUser $env:USERNAME
 
     It writes the config, checks it can really reach the database, registers the
     LIS to start at boot, opens the firewall for the analyzers, and stops the
     machine sleeping. It will tell you if the database is unreachable rather
     than letting you find out later.
 
- 4. Reboot.
+ 5. Reboot.
 
- 5. Check it came up. In a browser on this machine:
+ 6. Check it came up. In a browser on this machine:
 
       http://127.0.0.1:3000/api/health     expect 200
       http://127.0.0.1:3000                the sign-in page
