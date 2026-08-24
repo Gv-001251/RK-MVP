@@ -1,174 +1,304 @@
 ==============================================================================
- RK Clinic LIS - installing on the lab machine
+ RK CLINIC LIS - INSTALLING ON THE LAB MACHINE
 ==============================================================================
 
  This machine becomes the LIS. It holds the database, talks to the analyzers,
  and serves the web interface to every other device in the clinic. Nothing runs
- in the cloud, so nothing works when this machine is off.
+ in the cloud, so when this machine is off, the LIS is off.
 
- Everything below happens once. Budget half an hour, most of it MySQL.
+ Everything below happens once. Allow about half an hour, most of it MySQL.
 
-
- BEFORE YOU START
- ----------------
-
- Windows 10 or 11, 64-bit, and an Administrator account.
-
- MySQL 8.4 LTS, plus the Microsoft Visual C++ 2019 Redistributable (x64),
- which the server needs and which you should install first.
-
- Do NOT look for "MySQL Installer for Windows". That bundled tool stopped at
- 8.0 and Oracle does not ship it for 8.1 or later, so its download page shows
- nothing newer than 8.0.x and looks as though 8.4 does not exist. From 8.1
- onwards the server is a plain MSI:
-
-   https://dev.mysql.com/downloads/mysql/8.4.html
-   Select Operating System: Microsoft Windows -> MSI Installer
-
- or straight to the file, about 130 MB:
-
-   https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.10-winx64.msi
-
- Run the MSI, keep the default install location, and leave "Run MySQL
- Configurator" ticked at the end. Configurator is what the old installer's
- configuration screens became: it sets the port, the root password, and the
- Windows service.
-
- 8.4 is asked for because it is the version this release targets, not because
- newer ones are broken. When Configurator asks about the authentication
- method, take the default. Leave the legacy option alone: 8.4 ships with
- mysql_native_password switched off, and the app speaks the modern
- caching_sha2_password without any help.
-
- Keep "Configure MySQL Server as a Windows Service" with start at system
- startup, and set a root password you will still have in ten minutes. You need
- it for exactly one command.
-
- The files sit next to the app, normally:
-
-   C:\Program Files\RK Clinic LIS\rk-clinic-schema.sql
-   C:\Program Files\RK Clinic LIS\setup-windows.ps1
+ Read the whole of section 1 before starting. Two of the steps fail in
+ confusing ways if done out of order.
 
 
- THE ORDER MATTERS
- -----------------
+==============================================================================
+ 1. WHAT YOU NEED
+==============================================================================
 
- 1. Install MySQL 8.4, then confirm the service is running and find out where
-    it landed:
+ * Windows 10 or 11, 64-bit.
 
-      Get-Service MySQL*
-      Get-ChildItem "C:\Program Files\MySQL" -Directory | Select-Object Name
+ * An Administrator account. Several steps write to C:\Program Files and
+   register a scheduled task, and neither works from a normal shell.
 
- 2. Put the MySQL tools on PATH for this window. The MSI does not do it, so
-    without this the next step fails with "'mysql' is not recognized". Use the
-    folder name the command above printed:
+ * The Windows account the lab signs in as day to day. The LIS runs as that
+   account, so have its name (and password, if the machine should come back up
+   after a power cut without anyone logging in).
 
-      $env:Path += ";C:\Program Files\MySQL\MySQL Server 8.4\bin"
-      mysql --version
+ * Microsoft Visual C++ 2019 Redistributable (x64). MySQL will not run without
+   it. Install it FIRST.
 
- 3. Create the database, as root. This makes the tables, the staff logins, and
-    the restricted account the app itself connects as.
+     https://aka.ms/vs/17/release/vc_redist.x64.exe
 
-      cd "C:\Program Files\RK Clinic LIS"
-      cmd /c "mysql -u root -p < rk-clinic-schema.sql"
+ * MySQL 8.4 LTS.
 
-    The cmd /c is not decoration. PowerShell rejects '<' outright -- it reports
-    that the operator is reserved for future use -- so cmd has to perform the
-    redirection. Do not substitute Get-Content piped into mysql: this file is
-    full of non-ASCII box characters and PowerShell 5.1 pipes native input as
-    ASCII, which corrupts them in transit.
+   Do NOT search for "MySQL Installer for Windows". That bundled tool was
+   discontinued after 8.0, so its download page shows nothing newer than
+   8.0.x and it looks as though 8.4 does not exist. From 8.1 onwards the
+   server is a plain MSI:
 
-    It prints "Setup complete: 55 tables in `rk_clinic`". If instead it stops
-    with "STOP: this database already has tables", the database already exists
-    and this file is not the right tool - it only builds a fresh one.
+     https://dev.mysql.com/downloads/mysql/8.4.html
+     Select Operating System: Microsoft Windows, then MSI Installer
 
- 4. Run the setup script in an Administrator PowerShell. $env:USERNAME is the
-    account you are signed in as; to run the LIS as a different user put that
-    name in directly, for example -ServiceUser labuser. Never type angle
-    brackets: PowerShell reads '<' as redirection and refuses the line.
+   Or go straight to the file, about 130 MB:
 
-      powershell -ExecutionPolicy Bypass -File setup-windows.ps1 -ServiceUser $env:USERNAME
+     https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.10-winx64.msi
 
-    It writes the config, checks it can really reach the database, registers the
-    LIS to start at boot, opens the firewall for the analyzers, and stops the
-    machine sleeping. It will tell you if the database is unreachable rather
-    than letting you find out later.
-
- 5. Reboot.
-
- 6. Check it came up. In a browser on this machine:
-
-      http://127.0.0.1:3000/api/health     expect 200
-      http://127.0.0.1:3000                the sign-in page
-
-    Then from another PC on the same network, using this machine's IP:
-
-      http://<this-machine-ip>:3000
+ * The RK Clinic LIS installer, from the internal download page. Do not skip
+   the checksum step in section 3.
 
 
- SIGNING IN
- ----------
+==============================================================================
+ 2. INSTALL MYSQL
+==============================================================================
 
- Five accounts exist: admin, doctor, nurse_pharmacy, technician, receptionist.
- Their passwords were generated when rk-clinic-schema.sql was built and printed
- once, to whoever built it. They are stored here only as bcrypt hashes and
- cannot be read back out.
+ Install the Visual C++ redistributable, then run the MySQL MSI.
 
- Change them from Admin > Users after the first sign-in. Anyone holding the
- installer holds the hashes.
+ Keep the default install location. On the last page of the wizard leave
+ "Run MySQL Configurator" ticked. Configurator is where the old installer's
+ configuration screens went; it sets the port, the password and the service.
+
+ In Configurator:
+
+   Type and networking   Standalone, port 3306. Leave both alone.
+
+   Authentication        TAKE THE DEFAULT. Do not choose the legacy option.
+                         8.4 ships with mysql_native_password switched off,
+                         and the LIS speaks the modern caching_sha2_password
+                         without any help. Choosing legacy breaks the login.
+
+   Accounts and roles    Set a root password. You need it for exactly one
+                         command, in section 4. Write it down until then.
+
+   Windows service       Keep it enabled, with start at system startup. If it
+                         is not a service, the database will not be running
+                         after a reboot and the LIS will show errors on every
+                         page.
+
+ Then confirm it is running, and find out exactly where it landed:
+
+     Get-Service MySQL*
+     Get-ChildItem "C:\Program Files\MySQL" -Directory | Select-Object Name
+
+ The folder name follows the version you installed, so it may not be
+ "MySQL Server 8.4". Use whatever that second command prints in section 4.
 
 
- WHERE THINGS ARE
- ----------------
+==============================================================================
+ 3. INSTALL THE LIS
+==============================================================================
 
- Config      %APPDATA%\rk-clinic\.env.local
-             Database password and the analyzer API key. Readable only by the
-             service account and Administrators.
+ Check the download arrived intact. A truncated 178 MB download produces an
+ installer that fails in strange ways rather than an obvious error, and this
+ takes ten seconds. In PowerShell, in the folder you downloaded to:
 
- Logs        %APPDATA%\rk-clinic\logs\
-               service.log      the supervisor
-               server.log       the web app
-               hemat60.log      one file per analyzer bridge
-               mispaplus.log
-               afinion2.log
-               maglumi800.log
+     certutil -hashfile "RK Clinic LIS Setup 0.3.2.exe" SHA256
 
- Tray icon   Shows each analyzer as a live tile. Right-click for the log folder.
+ Compare the result with the checksum shown on the download page. If they
+ differ, download it again. Do not run it.
+
+ Then run the installer AS ADMINISTRATOR (right-click, Run as administrator).
+
+ Windows will warn about an unknown publisher, because the app is not
+ code-signed yet. Choose "More info", then "Run anyway".
+
+ The installer places three files next to the app, which the next two sections
+ use:
+
+     C:\Program Files\RK Clinic LIS\rk-clinic-schema.sql
+     C:\Program Files\RK Clinic LIS\setup-windows.ps1
+     C:\Program Files\RK Clinic LIS\INSTALL.txt      (this file)
 
 
- WHEN SOMETHING IS WRONG
- -----------------------
+==============================================================================
+ 4. CREATE THE DATABASE
+==============================================================================
 
- Every page returns 500, or "Internal Server Error"
-   The app cannot reach MySQL. Check the service is running, then check the
-   MYSQL_USER and MYSQL_PASSWORD in .env.local against the CREATE USER line in
-   rk-clinic-schema.sql. This accounts for nearly every failed install.
+ Open PowerShell AS ADMINISTRATOR and keep it open for sections 4 and 5.
 
- The app never starts
-   Look at service.log first. It records why each child process exited.
+ First put the MySQL tools on PATH for this window. The MSI does not do it,
+ and without this the next command fails with "'mysql' is not recognized".
+ Use the folder name from section 2:
+
+     $env:Path += ";C:\Program Files\MySQL\MySQL Server 8.4\bin"
+     mysql --version
+
+ If that prints a version, carry on. If not, the path is wrong; re-check the
+ folder name.
+
+ Now create the database. This builds the tables, the staff logins, and the
+ restricted MySQL account the LIS itself connects as:
+
+     cd "C:\Program Files\RK Clinic LIS"
+     cmd /c "mysql -u root -p < rk-clinic-schema.sql"
+
+ It asks for the MySQL ROOT password from section 2, not a Windows password.
+
+ The "cmd /c" is required, not decoration. PowerShell has no "<" redirection
+ operator and rejects the line with "The '<' operator is reserved for future
+ use", so cmd has to perform the redirection.
+
+ Do not replace it with Get-Content piped into mysql. That form runs but
+ PowerShell 5.1 encodes piped input as ASCII, which corrupts the file in
+ transit.
+
+ On success it prints:
+
+     Setup complete: 55 tables in `rk_clinic`
+
+ If instead it stops with "STOP: this database already has tables", then a
+ database called rk_clinic already exists. This file only builds a fresh one;
+ it refuses rather than damaging what is there.
+
+
+==============================================================================
+ 5. CONFIGURE WINDOWS
+==============================================================================
+
+ Still in the Administrator PowerShell, in the same folder:
+
+     powershell -ExecutionPolicy Bypass -File setup-windows.ps1 -ServiceUser $env:USERNAME
+
+ $env:USERNAME is the account you are signed in as. To run the LIS as a
+ different account, put that name in directly:
+
+     ... -File setup-windows.ps1 -ServiceUser labuser
+
+ Never type angle brackets around it. PowerShell reads "<" as redirection and
+ refuses the whole line.
+
+ Whichever account you name must have signed in at least once, because the
+ script writes the configuration into that account's profile. This is the
+ reason it asks at all: an elevated shell has its own APPDATA, so a config
+ written from an admin prompt would land in the administrator's profile, where
+ the service would never look for it.
+
+ If this machine must come back up on its own after a power cut, add the
+ Windows password for that account:
+
+     ... -File setup-windows.ps1 -ServiceUser $env:USERNAME -ServicePassword "the-windows-password"
+
+ Without it the LIS only starts once that user logs in. The script warns about
+ this rather than failing, so it is easy to miss and tends to surface weeks
+ later as "the LIS did not come back after the power went out".
+
+ The script writes the credentials file, checks it can genuinely query the
+ database before trusting that config, registers the LIS to start at boot,
+ opens the firewall for the analyzers, and stops the machine sleeping. It
+ reports each step. If it cannot reach the database it stops there and says so,
+ rather than leaving you to discover it later as errors in the browser.
+
+ Then restart the machine.
+
+
+==============================================================================
+ 6. CHECK IT WORKS
+==============================================================================
+
+ On this machine, in a browser:
+
+     http://127.0.0.1:3000/api/health     expect 200
+     http://127.0.0.1:3000                the sign-in page
+
+ From another PC on the same network, using this machine's address:
+
+     http://THIS-MACHINE-IP:3000
+
+ Find that address with:
+
+     ipconfig
+
+ The tray icon shows one tile per analyzer. Right-click it for the log folder.
+
+
+==============================================================================
+ 7. SIGNING IN
+==============================================================================
+
+ Five accounts exist: admin, doctor, nurse_pharmacy, technician and
+ receptionist. Their passwords were generated when this build was made and
+ supplied separately. They are stored here only as bcrypt hashes and cannot be
+ read back out of the database.
+
+ Change them from Admin > Users after the first sign-in. Anyone holding a copy
+ of the installer holds the same hashes.
+
+
+==============================================================================
+ 8. WHERE THINGS ARE
+==============================================================================
+
+ Configuration
+     %APPDATA%\rk-clinic\.env.local
+     Holds the database password and the analyzer API key. Readable only by
+     the service account and Administrators.
+
+ Logs
+     %APPDATA%\rk-clinic\logs\
+         service.log     the supervisor: why anything stopped
+         server.log      the web application
+         hemat60.log     one file per analyzer bridge
+         mispaplus.log
+         afinion2.log
+         maglumi800.log
+
+ Note that %APPDATA% belongs to the account the LIS runs as. From an
+ administrator shell, look under C:\Users\THAT-ACCOUNT\AppData\Roaming instead.
+
+
+==============================================================================
+ 9. WHEN SOMETHING IS WRONG
+==============================================================================
+
+ "Internal Server Error", or every page returns 500
+     The app cannot reach MySQL. This accounts for nearly every failed
+     install. Check the service is running with Get-Service MySQL*, then
+     compare MYSQL_USER and MYSQL_PASSWORD in .env.local against the
+     CREATE USER line in rk-clinic-schema.sql.
+
+ "'mysql' is not recognized"
+     PATH. See section 4. It applies only to the window you set it in.
+
+ "The '<' operator is reserved for future use"
+     A command was pasted into PowerShell that needs cmd. Use the cmd /c form
+     in section 4, and check you have not typed angle brackets as placeholders.
+
+ The LIS never starts
+     Read service.log first. It records why each child process exited.
 
  An analyzer tile stays grey
-   The instruments dial in to this machine, so the firewall rule and the network
-   adapter address matter more than anything on the analyzer. Give the
-   analyzer-side adapter 192.168.1.3. If the adapter is classified Public,
-   Windows ignores the rules the setup script added:
+     The instruments dial in to this machine, so the firewall rule and this
+     machine's address matter more than any setting on the analyzer. Give the
+     analyzer-side network adapter the address 192.168.1.3. If Windows has
+     classified that adapter as Public, it ignores the rules the setup script
+     added:
 
-     Set-NetConnectionProfile -InterfaceAlias "<name>" -NetworkCategory Private
+         Set-NetConnectionProfile -InterfaceAlias "ADAPTER-NAME" -NetworkCategory Private
 
- Windows warns about an unknown publisher
-   Expected. The installer is not code-signed yet. More info, then Run anyway.
+ Another PC cannot open the LIS
+     Confirm both machines are on the same network and that Windows treats it
+     as Private, then re-run the setup script, which re-adds the rules.
 
 
- TWO THINGS STILL WORTH DOING
- ----------------------------
+==============================================================================
+ 10. TWO THINGS STILL WORTH DOING
+==============================================================================
 
- Back up. Every patient record lives on this one machine. Schedule a mysqldump
- to a drive or share that is not this machine, and check it restores.
+ Back up. Every patient record lives on this one machine and nowhere else.
+ Schedule a mysqldump to a drive or share that is not this machine, and once
+ confirm that the backup restores. An untested backup is not a backup.
 
- If staff need the LIS from outside the clinic, install Tailscale here rather
- than forwarding port 3000. Port forwarding puts a clinical system on the public
- internet, and sign-in over plain HTTP sends passwords in the clear.
+ Lock the database down. Add this under [mysqld] in my.ini, normally at
+ C:\ProgramData\MySQL\MySQL Server 8.4\my.ini, then restart the service, so
+ nothing outside this machine can reach MySQL directly:
 
-   tailscale serve --bg https / http://127.0.0.1:3000
+     bind-address=127.0.0.1
+
+ If staff need the LIS from outside the clinic, install Tailscale on this
+ machine rather than forwarding port 3000. Port forwarding puts a clinical
+ system on the public internet, and signing in over plain HTTP sends passwords
+ in the clear.
+
+     tailscale serve --bg https / http://127.0.0.1:3000
 
 ==============================================================================

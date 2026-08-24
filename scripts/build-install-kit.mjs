@@ -68,7 +68,38 @@ for (const [from, to] of [
     console.error(`✖ missing ${from}`);
     process.exit(1);
   }
-  fs.writeFileSync(path.join(KIT, to), toCrlf(fs.readFileSync(src, 'utf8')));
+  let text = toCrlf(fs.readFileSync(src, 'utf8'));
+
+  // Everything staged here is read on Windows, by a shell and a text editor that
+  // both guess at encoding. Windows PowerShell 5.1 -- what `powershell -File`
+  // runs, and what the documented command line uses -- decodes a .ps1 as the
+  // system ANSI code page unless the file carries a UTF-8 BOM. On a cp1252
+  // machine every multi-byte character is then misread, and the damage is not
+  // cosmetic: both U+2500 and U+2014 encode a 0x94 byte, which cp1252 renders as
+  // a right double quotation mark, and PowerShell honours that as a string
+  // delimiter. One em dash in a message therefore ends its string early and
+  // every construct after it fails to parse. That is exactly how 0.3.1 shipped:
+  // 395 such characters, and a setup script that could not run at all.
+  //
+  // So refuse to stage anything but ASCII. It costs nothing -- these are English
+  // instructions and a script -- and it removes the whole class of failure,
+  // which is otherwise invisible until it reaches a clinic.
+  const offending = [...new Set([...text].filter((c) => c.charCodeAt(0) > 127))];
+  if (offending.length) {
+    console.error(`✖ ${from} contains characters that Windows will misdecode:`);
+    for (const c of offending) {
+      console.error(`    U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')} ${JSON.stringify(c)}`);
+    }
+    console.error('  Replace them with ASCII equivalents and rebuild.');
+    process.exit(1);
+  }
+
+  // A BOM on the script as a second defence, so that an edit made later on the
+  // clinic machine is still decoded as UTF-8 rather than reviving the bug. Left
+  // off the text file, where a BOM shows up as stray characters in some viewers.
+  if (to.endsWith('.ps1')) text = '\ufeff' + text;
+
+  fs.writeFileSync(path.join(KIT, to), text);
   log(`staged ${to}`);
 }
 
