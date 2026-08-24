@@ -47,7 +47,7 @@ function valid(cookieHeader, secret) {
  */
 module.exports = async (req, res) => {
   const secret = process.env.DOWNLOAD_SECRET;
-  const pathname = process.env.BLOB_PATHNAME || "installer-0.3.2.exe";
+  const pathname = process.env.BLOB_PATHNAME || "installer-0.3.3.exe";
 
   if (!secret || !valid(req.headers.cookie, secret)) {
     res.statusCode = 303;
