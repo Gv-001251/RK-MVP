@@ -22,7 +22,9 @@
  It does NOT create the database either, and the order matters: run the schema
  file FIRST, as root, then this script.
 
-   mysql -u root -p < "C:\Program Files\RK Clinic LIS\rk-clinic-schema.sql"
+   cmd /c "mysql -u root -p < \"C:\Program Files\RK Clinic LIS\rk-clinic-schema.sql\""
+
+ PowerShell has no '<' redirection operator, so cmd has to do it.
 
  That file ships alongside the app from 0.3.1 onwards. It creates the schema, the
  staff accounts, and the low-privilege MySQL account the app connects as. This
@@ -174,7 +176,7 @@ if ($mysqlExe) {
     Write-Warn "could not query '$MysqlDatabase' as '$MysqlUser':"
     Write-Warn "   $probe"
     throw ("Stopping before writing a config that cannot work. Apply the schema " +
-           "first, as root:`n    mysql -u root -p < `"$SchemaFile`"")
+           "first, as root:`n    cmd /c `"mysql -u root -p < '$SchemaFile'`"")
   }
   Write-Ok "database reachable as '$MysqlUser' — $(($probe | Out-String).Trim()) staff account(s) found"
 } else {
@@ -320,7 +322,7 @@ Write-Host @"
      certificate, instead of sending passwords over plain HTTP.
 
   1. If the schema step was skipped, do it now as root and re-run this script:
-       mysql -u root -p < "$SchemaFile"
+       cmd /c "mysql -u root -p < '$SchemaFile'"
      Then set bind-address=127.0.0.1 in my.ini and restart MySQL, so nothing off
      this machine can reach the database directly.
 

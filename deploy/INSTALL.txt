@@ -14,10 +14,35 @@
 
  Windows 10 or 11, 64-bit, and an Administrator account.
 
- MySQL 8.4 LTS. Not 9.x. The 9.x line drops authentication plugins between
- releases and the app cannot log in to it. Download "MySQL Installer for
- Windows", choose Server only, and set a root password you will still have in
- ten minutes.
+ MySQL 8.4 LTS, plus the Microsoft Visual C++ 2019 Redistributable (x64),
+ which the server needs and which you should install first.
+
+ Do NOT look for "MySQL Installer for Windows". That bundled tool stopped at
+ 8.0 and Oracle does not ship it for 8.1 or later, so its download page shows
+ nothing newer than 8.0.x and looks as though 8.4 does not exist. From 8.1
+ onwards the server is a plain MSI:
+
+   https://dev.mysql.com/downloads/mysql/8.4.html
+   Select Operating System: Microsoft Windows -> MSI Installer
+
+ or straight to the file, about 130 MB:
+
+   https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.10-winx64.msi
+
+ Run the MSI, keep the default install location, and leave "Run MySQL
+ Configurator" ticked at the end. Configurator is what the old installer's
+ configuration screens became: it sets the port, the root password, and the
+ Windows service.
+
+ 8.4 is asked for because it is the version this release targets, not because
+ newer ones are broken. When Configurator asks about the authentication
+ method, take the default. Leave the legacy option alone: 8.4 ships with
+ mysql_native_password switched off, and the app speaks the modern
+ caching_sha2_password without any help.
+
+ Keep "Configure MySQL Server as a Windows Service" with start at system
+ startup, and set a root password you will still have in ten minutes. You need
+ it for exactly one command.
 
  The files sit next to the app, normally:
 
@@ -36,7 +61,13 @@
     the restricted account the app itself connects as.
 
       cd "C:\Program Files\RK Clinic LIS"
-      mysql -u root -p < rk-clinic-schema.sql
+      cmd /c "mysql -u root -p < rk-clinic-schema.sql"
+
+    The cmd /c is not decoration. PowerShell rejects '<' outright -- it reports
+    that the operator is reserved for future use -- so cmd has to perform the
+    redirection. Do not substitute Get-Content piped into mysql: this file is
+    full of non-ASCII box characters and PowerShell 5.1 pipes native input as
+    ASCII, which corrupts them in transit.
 
     It prints "Setup complete: 55 tables in `rk_clinic`". If instead it stops
     with "STOP: this database already has tables", the database already exists
