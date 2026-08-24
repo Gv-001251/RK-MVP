@@ -81,6 +81,46 @@ function Write-Step { param($m) Write-Host "`n=== $m" -ForegroundColor Cyan }
 function Write-Ok   { param($m) Write-Host "  [ok] $m" -ForegroundColor Green }
 function Write-Warn { param($m) Write-Host "  [!!] $m" -ForegroundColor Yellow }
 
+<#
+  Run a console program and hand back its exit code, tolerating whatever it
+  writes to stderr.
+
+  This is not defensive padding, it is required. While $ErrorActionPreference is
+  'Stop', Windows PowerShell turns a native command's stderr output into a
+  terminating error, and redirecting with *> $null does NOT prevent it. Several
+  of the programs below use stderr to report the ordinary "nothing there" case:
+
+    schtasks /query   for a task that does not exist yet
+    netsh delete rule when there is no such rule
+
+  On a first install both are the normal path, so the script died at the first
+  schtasks call on every clean machine. Relaxing the preference around the native
+  call only, rather than for the whole script, keeps cmdlet failures fatal.
+#>
+function Invoke-Native {
+  param(
+    [Parameter(Mandatory)] [string]   $Exe,
+    [Parameter(Mandatory)] [string[]] $Arguments,
+    # Show what the program printed. Off by default because these calls are
+    # probes whose output is noise when things are working.
+    [switch] $Show
+  )
+
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $output = & $Exe @Arguments 2>&1
+    $exit = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previous
+  }
+
+  if ($Show -and $output) {
+    foreach ($line in $output) { Write-Host "       $line" -ForegroundColor DarkGray }
+  }
+  return $exit
+}
+
 # -- Preconditions -----------------------------------------------------------
 
 $isAdmin = ([Security.Principal.WindowsPrincipal] `
@@ -229,10 +269,9 @@ if (-not $SkipTask) {
   Write-Step 'Background service'
 
   $taskName = 'RK Clinic LIS'
-  schtasks /query /tn $taskName *> $null
-  if ($LASTEXITCODE -eq 0) {
+  if ((Invoke-Native schtasks @('/query', '/tn', $taskName)) -eq 0) {
     Write-Warn 'task already exists -- replacing it'
-    schtasks /delete /tn $taskName /f *> $null
+    Invoke-Native schtasks @('/delete', '/tn', $taskName, '/f') | Out-Null
   }
 
   # Not $args: that is an automatic variable holding the script's own unbound
@@ -242,8 +281,11 @@ if (-not $SkipTask) {
                 '/sc', 'onstart', '/rl', 'highest', '/f', '/ru', $ServiceUser)
   if ($ServicePassword) { $taskArgs += @('/rp', $ServicePassword) }
 
-  schtasks @taskArgs
-  if ($LASTEXITCODE -ne 0) { throw 'schtasks failed to register the service.' }
+  # -Show here, unlike the probes above: if registering the task fails, whatever
+  # schtasks said about why is the most useful thing on the screen.
+  if ((Invoke-Native schtasks $taskArgs -Show) -ne 0) {
+    throw 'schtasks failed to register the service. Its message is above.'
+  }
 
   Write-Ok "registered '$taskName' to start at boot as $ServiceUser"
   if (-not $ServicePassword) {
@@ -267,28 +309,39 @@ if (-not $SkipFirewall) {
     @{ Name = 'RK LIS Mispa Plus';  Port = 8888; Scope = 'private' }
   )
 
+  # Delete first so re-running replaces a rule instead of stacking duplicates.
+  # On a first install the delete finds nothing and says so on stderr, which is
+  # why it goes through Invoke-Native.
   foreach ($rule in $rules) {
-    netsh advfirewall firewall delete rule name="$($rule.Name)" *> $null
-    netsh advfirewall firewall add rule `
-      name="$($rule.Name)" dir=in action=allow protocol=TCP `
-      localport=$($rule.Port) profile=private *> $null
+    Invoke-Native netsh @('advfirewall', 'firewall', 'delete', 'rule',
+      "name=$($rule.Name)") | Out-Null
+
+    $added = Invoke-Native netsh @('advfirewall', 'firewall', 'add', 'rule',
+      "name=$($rule.Name)", 'dir=in', 'action=allow', 'protocol=TCP',
+      "localport=$($rule.Port)", 'profile=private') -Show
+
+    if ($added -ne 0) { throw "netsh could not add the rule for TCP $($rule.Port)." }
     Write-Ok "allowed inbound TCP $($rule.Port) from the local network -- $($rule.Name)"
   }
 
-  netsh advfirewall firewall delete rule name='RK LIS web' *> $null
+  Invoke-Native netsh @('advfirewall', 'firewall', 'delete', 'rule',
+    'name=RK LIS web') | Out-Null
+
   if ($TailnetOnly) {
     # 100.64.0.0/10 is the CGNAT range Tailscale assigns. Any profile, because a
     # VPN adapter is often classified Public and a Private-only rule would not
     # apply to it -- but restricted by source address, which is tighter than a
     # profile rule anyway.
-    netsh advfirewall firewall add rule `
-      name='RK LIS web' dir=in action=allow protocol=TCP `
-      localport=$WebPort remoteip=100.64.0.0/10 *> $null
+    $added = Invoke-Native netsh @('advfirewall', 'firewall', 'add', 'rule',
+      'name=RK LIS web', 'dir=in', 'action=allow', 'protocol=TCP',
+      "localport=$WebPort", 'remoteip=100.64.0.0/10') -Show
+    if ($added -ne 0) { throw "netsh could not add the web rule for TCP $WebPort." }
     Write-Ok "allowed inbound TCP $WebPort from the Tailscale range only (100.64.0.0/10)"
   } else {
-    netsh advfirewall firewall add rule `
-      name='RK LIS web' dir=in action=allow protocol=TCP `
-      localport=$WebPort profile=private *> $null
+    $added = Invoke-Native netsh @('advfirewall', 'firewall', 'add', 'rule',
+      'name=RK LIS web', 'dir=in', 'action=allow', 'protocol=TCP',
+      "localport=$WebPort", 'profile=private') -Show
+    if ($added -ne 0) { throw "netsh could not add the web rule for TCP $WebPort." }
     Write-Ok "allowed inbound TCP $WebPort from the local network"
     Write-Warn 'If the hospital connects over a VPN, re-run with -TailnetOnly for a tighter rule.'
   }
@@ -308,9 +361,13 @@ if (-not $SkipFirewall) {
 
 if (-not $SkipPower) {
   Write-Step 'Power'
-  powercfg /change standby-timeout-ac 0
-  powercfg /change hibernate-timeout-ac 0
-  powercfg /change disk-timeout-ac 0
+  foreach ($timeout in @('standby-timeout-ac', 'hibernate-timeout-ac', 'disk-timeout-ac')) {
+    if ((Invoke-Native powercfg @('/change', $timeout, '0') -Show) -ne 0) {
+      # Not fatal. A machine that still sleeps is a problem to fix, but it is not
+      # a reason to abandon a setup that has already configured everything else.
+      Write-Warn "powercfg could not set $timeout; set it by hand in Power Options."
+    }
+  }
   Write-Ok 'sleep, hibernate and disk timeout disabled on AC power'
 }
 
