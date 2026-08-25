@@ -272,11 +272,38 @@
  An analyzer tile stays grey
      The instruments dial in to this machine, so the firewall rule and this
      machine's address matter more than any setting on the analyzer. Give the
-     analyzer-side network adapter the address 192.168.1.3. If Windows has
-     classified that adapter as Public, it ignores the rules the setup script
-     added:
+     analyzer-side network adapter the address 192.168.1.3, and check the
+     instrument is configured to send to that same address on its own LIS screen.
 
-         Set-NetConnectionProfile -InterfaceAlias "ADAPTER-NAME" -NetworkCategory Private
+ The analyzer connects, then disconnects with "0 keep-alive(s)", over and over
+     This one looks like success and is not. The log shows the instrument
+     connecting every twenty seconds and leaving again, having sent nothing:
+
+         analyzer connected: 169.254.83.69:35130
+         disconnected: 169.254.83.69:35130 (0 keep-alive(s))
+
+     A TCP connection that is accepted but carries no data means something is
+     permitting the handshake and dropping the stream, and that is almost always
+     the firewall. Confirm it by turning it off for half a minute -- safe on an
+     isolated analyzer segment with no route to the internet:
+
+         Set-NetFirewallProfile -Profile Private -Enabled False
+         Start-Sleep -Seconds 25
+         Get-Content "$env:APPDATA\rk-clinic\logs\hemat60.log" -Tail 8
+         Set-NetFirewallProfile -Profile Private -Enabled True
+
+     If keep-alives appear while it is off, the rule is not matching. Re-run this
+     setup script, which scopes the analyzer rules by source address rather than
+     by network profile for exactly this reason. Note that a connection
+     established while the firewall was off keeps working afterwards, so judge
+     the fix by a connection that starts after it.
+
+ An analyzer's address keeps changing
+     With no DHCP server on the analyzer segment, instruments self-assign an
+     address in 169.254.x.x and it can change on any power cycle. That is
+     harmless: the instruments always dial the LIS, never the reverse, so only
+     this machine's address has to stay put. The firewall rules admit both
+     192.168.1.0/24 and 169.254.0.0/16 for that reason.
 
  Another PC cannot open the LIS
      Confirm both machines are on the same network and that Windows treats it

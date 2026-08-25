@@ -325,23 +325,40 @@ if (-not $SkipFirewall) {
   # cabled segment and dial in from there. Only the web port is reached from the
   # other site, so only it needs widening -- and widening it as little as possible.
   $rules = @(
-    @{ Name = 'RK LIS Hemat 60';    Port = 8080; Scope = 'private' },
-    @{ Name = 'RK LIS Mispa Plus';  Port = 8888; Scope = 'private' }
+    @{ Name = 'RK LIS Hemat 60';    Port = 8080 },
+    @{ Name = 'RK LIS Mispa Plus';  Port = 8888 }
   )
 
-  # Delete first so re-running replaces a rule instead of stacking duplicates.
-  # On a first install the delete finds nothing and says so on stderr, which is
-  # why it goes through Invoke-Native.
+  # Scoped by source address rather than by firewall profile, and this is the
+  # difference between working and not.
+  #
+  # An analyzer segment is a switch with instruments on it and no router. Windows
+  # cannot identify a network with no gateway, calls it "Unidentified", and treats
+  # it as Public -- and setting NetworkCategory to Private does not reliably reach
+  # the firewall engine until the network is re-identified. A profile=private rule
+  # therefore never applies. What that looks like in the field is worse than an
+  # outright block: the TCP handshake is permitted, so the bridge logs the
+  # analyzer connecting and the dashboard shows a healthy instrument, while every
+  # byte of data is dropped and no result ever arrives. Observed on the first
+  # clinic install as connect, fifteen seconds of silence, disconnect, repeating
+  # forever with "0 keep-alive(s)".
+  #
+  # Restricting by source address instead is both immune to the classification and
+  # tighter than the rule it replaces: profile=private would have let anything on
+  # the clinic LAN reach the ingestion ports and post fabricated results, whereas
+  # this only admits the analyzer segments themselves.
+  $analyzerSources = @('192.168.1.0/24', '169.254.0.0/16')
+
   foreach ($rule in $rules) {
     Invoke-Native netsh @('advfirewall', 'firewall', 'delete', 'rule',
       "name=$($rule.Name)") | Out-Null
 
     $added = Invoke-Native netsh @('advfirewall', 'firewall', 'add', 'rule',
       "name=$($rule.Name)", 'dir=in', 'action=allow', 'protocol=TCP',
-      "localport=$($rule.Port)", 'profile=private') -Show
+      "localport=$($rule.Port)", "remoteip=$($analyzerSources -join ',')") -Show
 
     if ($added -ne 0) { throw "netsh could not add the rule for TCP $($rule.Port)." }
-    Write-Ok "allowed inbound TCP $($rule.Port) from the local network -- $($rule.Name)"
+    Write-Ok "allowed inbound TCP $($rule.Port) from the analyzer segments only -- $($rule.Name)"
   }
 
   Invoke-Native netsh @('advfirewall', 'firewall', 'delete', 'rule',
@@ -366,12 +383,19 @@ if (-not $SkipFirewall) {
     Write-Warn 'If the hospital connects over a VPN, re-run with -TailnetOnly for a tighter rule.'
   }
 
+  # The analyzer rules above are scoped by address and apply on every profile, so
+  # they no longer care about this. The web rule still does: it has to admit staff
+  # from a network whose subnet we cannot know in advance, so it is scoped by
+  # profile, and a Public classification silently keeps them out.
   $public = Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -eq 'Public' }
   if ($public) {
-    Write-Warn 'These adapters are classified Public, so the rules above do NOT apply to them:'
+    Write-Warn 'These adapters are classified Public:'
     $public | ForEach-Object { Write-Warn "   $($_.InterfaceAlias)" }
-    Write-Warn 'If an analyzer is on one of them, set it to Private:'
-    Write-Warn '   Set-NetConnectionProfile -InterfaceAlias "<name>" -NetworkCategory Private'
+    Write-Warn "The analyzer rules are unaffected, but staff on such a network cannot"
+    Write-Warn "open the LIS on port $WebPort. If that is the clinic network, set it Private:"
+    Write-Warn '   Set-NetConnectionProfile -InterfaceAlias "NAME" -NetworkCategory Private'
+    Write-Warn 'Note that Windows re-evaluates a network when its address changes, and can'
+    Write-Warn 'revert the category, so check it again after any addressing change.'
   }
 }
 

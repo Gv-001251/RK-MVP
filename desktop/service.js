@@ -154,6 +154,13 @@ function main() {
     console.log(`${service.id}: ${service.status}${service.lastError ? ` — ${service.lastError}` : ''}`);
   });
 
+  // Before starting anything: a bridge abandoned by a previous supervisor still
+  // holds its analyzer port, and the replacement would fail EADDRINUSE until the
+  // supervisor gave up on it.
+  for (const { id, pid } of supervisor.reclaimOrphans()) {
+    console.log(`${id}: killed an orphan from a previous run (pid ${pid}) to free its port`);
+  }
+
   supervisor.startEnabled();
   supervisor.publishState();
 

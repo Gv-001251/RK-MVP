@@ -595,6 +595,13 @@ function bootstrap() {
   }
 
   applyPowerBlocker();
+
+  // A bridge left running by a previous session still owns its analyzer port, so
+  // clear those out before competing with them for it.
+  for (const { id, pid } of supervisor.reclaimOrphans()) {
+    console.log(`${id}: killed an orphan from a previous run (pid ${pid}) to free its port`);
+  }
+
   supervisor.startEnabled();
 
   // Uptime and status text drift as processes run; a slow tick keeps the menu

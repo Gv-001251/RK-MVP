@@ -50,7 +50,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 
 /** Died this soon after starting? Then it never really started. */
 const QUICK_FAIL_MS = 10_000;
@@ -203,6 +203,74 @@ class Supervisor extends EventEmitter {
       fs.renameSync(tmp, this.stateFile);
     } catch {
       // Losing a status file must never disturb a running bridge.
+    }
+  }
+
+  /**
+   * Kill children left behind by a previous supervisor, and report what was
+   * killed. Call this before starting anything.
+   *
+   * Stopping the Windows scheduled task ends the supervisor but does not
+   * reliably take its children with it — Windows has no process group to signal,
+   * and the IPC shutdown path only runs when the parent gets the chance to ask.
+   * An abandoned bridge keeps listening on its analyzer port, so the replacement
+   * bridge fails with EADDRINUSE, retries, and is given up on. Observed on the
+   * clinic machine: `listen EADDRINUSE :::8080` five times, then
+   * `gave up after 5 failed starts`, leaving the LIS running with no route for
+   * results while the dashboard looked healthy.
+   *
+   * The old process is also the wrong code after an upgrade, so adopting it
+   * instead of killing it would be worse than the crash.
+   */
+  reclaimOrphans() {
+    if (!this.stateFile) return [];
+
+    let previous;
+    try {
+      previous = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
+    } catch {
+      return [];
+    }
+    // Our own state file from this run: nothing to reclaim.
+    if (!previous || previous.pid === process.pid) return [];
+
+    const reclaimed = [];
+    for (const service of previous.services || []) {
+      const pid = service?.pid;
+      if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid) continue;
+      if (!this._looksLikeOurChild(pid)) continue;
+      try {
+        process.kill(pid, 'SIGKILL');
+        reclaimed.push({ id: service.id ?? 'unknown', pid });
+      } catch {
+        // Already gone, or not ours to signal. Either way, leave it.
+      }
+    }
+    return reclaimed;
+  }
+
+  /**
+   * Would killing this pid kill one of our children, or something innocent?
+   *
+   * A recorded pid on its own is not enough to act on. Pids are recycled, and the
+   * number written yesterday may belong to anything at all today — on a machine
+   * holding patient records, killing a stranger by arithmetic is not acceptable.
+   * So confirm the process is still running the binary we spawn children with,
+   * and treat "cannot tell" as "do not touch".
+   */
+  _looksLikeOurChild(pid) {
+    const expected = path.basename(this.nodePath).toLowerCase();
+    try {
+      // stderr is discarded: asking about a pid that is out of range or already
+      // gone makes ps and tasklist complain, and that complaint would land in
+      // the service log looking like a fault when it is a normal answer of "no".
+      const io = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true };
+      const out = process.platform === 'win32'
+        ? execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], io)
+        : execFileSync('ps', ['-p', String(pid), '-o', 'comm='], io);
+      return out.toLowerCase().includes(expected);
+    } catch {
+      return false;
     }
   }
 
