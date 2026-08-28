@@ -48,6 +48,25 @@ const PORT = parseInt(process.env.BRIDGE_PORT || '8080', 10);
 const BASE_URL = (process.env.LIS_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
 const API_KEY = process.env.LIS_ANALYZER_API_KEY;
 const ANALYZER_ID = process.env.BRIDGE_ANALYZER_ID || 'hemat60';
+
+/**
+ * Whether to answer each message with an HL7 accept-acknowledgement.
+ *
+ * Off by default, and that default is deliberate. The Hemat 60 asks for nothing:
+ * it declares NE (never) for acknowledgement, and this bridge has run silently
+ * against it in production. Writing unexpected bytes at an instrument is not
+ * harmless either -- sending ENQ/ACK at the Afinion's older DLE interface earned
+ * an immediate ECONNRESET every time.
+ *
+ * The Afinion 2 in HL7 mode is the opposite case. Its header declares MSH-15=AL,
+ * accept acknowledgement ALWAYS, so with no reply it assumes every message failed
+ * and resends the same result every 30 seconds indefinitely. Left unacknowledged
+ * that is not merely noisy: each retransmission is a fresh result as far as the
+ * LIS is concerned, so one cartridge would accumulate duplicates forever.
+ *
+ * Set BRIDGE_ACK=1 for analyzers that ask for it.
+ */
+const SEND_ACK = /^(1|true|yes)$/i.test(process.env.BRIDGE_ACK || '');
 const REPLAY = process.argv.includes('--replay');
 
 const SPOOL_DIR = dataDir('bridge-spool');
@@ -128,6 +147,77 @@ function isKeepAlive(buf) {
 
 const MLLP_START = 0x0b;   // <VT>
 const MLLP_END = 0x1c;     // <FS>
+
+/** Fields of an HL7 segment, where index 0 is the segment name. */
+function segmentFields(frame, name) {
+  const text = Buffer.isBuffer(frame) ? frame.toString('latin1') : String(frame);
+  // Segments are CR-separated in HL7. Some senders add LF; tolerate both.
+  const line = text.split(/[\r\n]+/).find((l) => l.startsWith(`${name}|`));
+  return line ? line.split('|') : null;
+}
+
+/**
+ * MSH-10, the message control id. This is what an acknowledgement must echo, and
+ * it is the only way the sender can tell which message is being answered.
+ */
+export function controlIdOf(frame) {
+  const msh = segmentFields(frame, 'MSH');
+  // MSH is numbered with the field separator counted as MSH-1, so the array index
+  // is one lower than the HL7 field number: MSH-10 is msh[9].
+  return msh ? (msh[9] || '') : '';
+}
+
+/**
+ * Build an MLLP-wrapped HL7 accept-acknowledgement for a received message.
+ *
+ * Returns null when there is no MSH to answer, which is the honest response to
+ * something we cannot identify -- inventing an ack for an unparseable message
+ * would tell the instrument its result was safe when we have no idea what it was.
+ *
+ * The routing fields are mirrored: our sending application is whatever the
+ * instrument addressed as the receiver, and vice versa. MSA-1 is AA, application
+ * accept. If an instrument ever insists on enhanced-mode semantics it will want
+ * CA (commit accept) instead; the Afinion 2 declares MSH-16=NE, no application
+ * acknowledgement, so AA is the correct answer for it.
+ *
+ * @param {Buffer|string} frame  the received message, without MLLP framing
+ * @returns {Buffer|null}        the reply, framed and ready to write
+ */
+export function buildAck(frame) {
+  const msh = segmentFields(frame, 'MSH');
+  if (!msh) return null;
+
+  const sendingApp = msh[2] || '';        // MSH-3 from them
+  const sendingFacility = msh[3] || '';   // MSH-4
+  const receivingApp = msh[4] || '';      // MSH-5
+  const receivingFacility = msh[5] || ''; // MSH-6
+  const messageType = msh[8] || '';       // MSH-9, e.g. ORU^R01
+  const controlId = msh[9] || '';         // MSH-10
+  const version = msh[11] || '2.4';       // MSH-12
+
+  const now = new Date();
+  const p = (n, w = 2) => String(n).padStart(w, '0');
+  const stamp = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}`
+    + `${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+
+  // Mirror the trigger event so ORU^R01 is answered ACK^R01. A bare ACK is legal
+  // too, but echoing the event is what most analyzers expect to see.
+  const trigger = messageType.split('^')[1] || '';
+  const ackType = trigger ? `ACK^${trigger}` : 'ACK';
+
+  const segments = [
+    ['MSH', '^~\\&', receivingApp, receivingFacility, sendingApp, sendingFacility,
+      stamp, '', ackType, controlId || stamp, 'P', version].join('|'),
+    ['MSA', 'AA', controlId].join('|'),
+  ];
+
+  const body = `${segments.join('\r')}\r`;
+  return Buffer.concat([
+    Buffer.from([MLLP_START]),
+    Buffer.from(body, 'latin1'),
+    Buffer.from([MLLP_END, 0x0d]),
+  ]);
+}
 
 /**
  * Split a receive buffer into complete MLLP-framed messages.
@@ -762,6 +852,22 @@ function main() {
 
       for (const frame of frames) {
         log(`⬇ frame: ${frame.length} bytes`);
+
+        // Acknowledge before handling, not after. The analyzer is waiting on a
+        // timer, and posting to the LIS can take longer than that timer allows --
+        // a slow database would look to the instrument like a lost message and
+        // provoke the retransmit we are trying to stop. The ack says "received",
+        // not "stored"; the spool is what guarantees the rest.
+        if (SEND_ACK) {
+          const ack = buildAck(frame);
+          if (ack) {
+            sock.write(ack);
+            log(`⬆ ACK for control id ${controlIdOf(frame) || '(none)'}`);
+          } else {
+            warn('could not build an ACK for this frame — no MSH segment');
+          }
+        }
+
         handleFrame(frame).catch((e) => warn(`frame handling failed: ${e.message}`));
       }
 
