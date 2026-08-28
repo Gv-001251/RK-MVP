@@ -32,6 +32,10 @@ function run(command, args, env = {}) {
     stdio: 'inherit',
     env: { ...process.env, ...env },
     cwd: root,
+    // On Windows, npx/esbuild resolve to .cmd shims that Node cannot spawn
+    // directly (spawnSync returns status: null). Running through the shell lets
+    // the command resolve the same way it does in a terminal, on every platform.
+    shell: true,
   });
   if (res.status !== 0) {
     console.error(`\n✖ ${command} ${args.join(' ')} failed with code ${res.status}`);
