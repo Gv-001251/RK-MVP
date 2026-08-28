@@ -29,6 +29,10 @@
 # committed. The bridges write here at runtime.
 /tmp/
 
+# Testing-mode PDF captures of received analyzer results (LIS_DUMP_RESULTS_PDF).
+# Contain result data — never commit.
+/received-results/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

@@ -5,6 +5,7 @@ import { getAuthenticatedUser, writeAuditLog } from '@/lib/auth-middleware';
 import { broadcastRealtimeEvent } from '@/lib/realtime-registry';
 import { applyAnalyzerResults } from '@/lib/apply-analyzer-results';
 import { normaliseResultImages, storeResultImages } from '@/lib/result-images';
+import { isPdfDumpEnabled, dumpResultToPdf } from '@/lib/dump-result-pdf';
 
 /** Constant-time comparison so the API key can't be guessed via timing. */
 function safeEqual(a, b) {
@@ -55,6 +56,36 @@ export async function POST(request) {
     }
     if (!actorName) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // ── TESTING-ONLY sink (LIS_DUMP_RESULTS_PDF) ──
+    // During bring-up, capture every incoming result to a PDF verbatim and stop:
+    // no barcode matching, no patient lookup, no DB writes, no held/exception
+    // logic. This deliberately bypasses the "positive match only" safety model
+    // and MUST be off in production; the normal flow below runs when unset.
+    if (isPdfDumpEnabled()) {
+      try {
+        const { filePath, fileName } = dumpResultToPdf({
+          analyzerId, specimenId, messageId: body.messageId, tests, raw, images, actorName,
+        });
+        console.warn(`[LIS_DUMP_RESULTS_PDF] wrote result capture to ${filePath}`);
+        return Response.json(
+          {
+            status: 'captured',
+            mode: 'pdf-dump',
+            message: 'Testing mode: result captured to PDF without matching or verification.',
+            file: fileName,
+            path: filePath,
+          },
+          { status: 200 }
+        );
+      } catch (e) {
+        console.error('[LIS_DUMP_RESULTS_PDF] failed to write PDF:', e);
+        return Response.json(
+          { error: 'Testing mode: failed to write result PDF.', detail: String(e?.message || e) },
+          { status: 500 }
+        );
+      }
     }
 
     // ── Validate payload ──
