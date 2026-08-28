@@ -37,6 +37,7 @@ import QualityControlPanel from '../components/QualityControlPanel';
 import LabReportsPanel from '../components/LabReportsPanel';
 import LaboratoryPanel from '../components/LaboratoryPanel';
 import AnalyzerManagementPanel from '../components/AnalyzerManagementPanel';
+import MaglumiControlPanel from '../components/MaglumiControlPanel';
 import InventoryManagementPanel from '../components/InventoryManagementPanel';
 import DoctorPortalPanel from '../components/DoctorPortalPanel';
 import AnalyticsDashboardPanel from '../components/AnalyticsDashboardPanel';
@@ -49,6 +50,7 @@ const WIDE_PANELS = new Set([
   'analytics',
   'lab_reports',
   'quality_control',
+  'maglumi_control',
   'admin',
   'registration',
 ]);
@@ -118,6 +120,8 @@ export default function Home() {
         return <LaboratoryPanel />;
       case 'analyzer_mgmt':
         return <AnalyzerManagementPanel />;
+      case 'maglumi_control':
+        return <MaglumiControlPanel />;
       case 'inventory':
         return <InventoryManagementPanel />;
 

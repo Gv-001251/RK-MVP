@@ -1,0 +1,54 @@
+{
+  "lis": {
+    "endpoint": "http://localhost:3000/api/lab/analyzer/results",
+    "hostQueryEndpoint": "http://localhost:3000/api/lab/host-query",
+    "apiKey": "fb4df1a6aa69334d175dab4fd9afd9e76ef31da84d5e66eebef30e74f952ca3c"
+  },
+  "queueDir": "./.queue",
+  "machines": [
+    {
+      "id": "mbplus",
+      "name": "MB+ Electrolyte Analyzer",
+      "transport": "serial",
+      "comPort": "COM7",
+      "baud": 9600,
+      "protocol": "astm",
+      "reconnectMs": 5000,
+      "watchdogMs": 0
+    },
+    {
+      "id": "uriplus300",
+      "name": "Uri-Plus 300 (Urine Analyzer)",
+      "transport": "serial",
+      "comPort": "COM8",
+      "baud": 9600,
+      "protocol": "astm",
+      "reconnectMs": 5000,
+      "watchdogMs": 0
+    },
+    {
+      "id": "rapidstar20",
+      "name": "Rapid Star 20",
+      "transport": "serial",
+      "comPort": "COM9",
+      "baud": 9600,
+      "protocol": "astm",
+      "reconnectMs": 5000,
+      "watchdogMs": 0
+    },
+    {
+      "id": "wondfo",
+      "name": "Wondfo Rapid (POCT)",
+      "transport": "tcp-server",
+      "port": 7100,
+      "protocol": "hl7"
+    },
+    {
+      "id": "weldonwb150",
+      "name": "Weldon WB-150 (Biochemistry)",
+      "transport": "tcp-server",
+      "port": 8084,
+      "protocol": "astm"
+    }
+  ]
+}
