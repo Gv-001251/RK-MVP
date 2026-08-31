@@ -42,13 +42,19 @@ export async function PATCH(request, { params }) {
       return Response.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // The whole body used to go into the audit trail, which meant a password
+    // reset wrote the new plaintext password into audit_logs.changes_json —
+    // readable by anyone who can read that table, and kept for as long as the
+    // audit history is. Record THAT the password changed, never the value. The
+    // create-user route whitelists its fields for the same reason.
+    const { password, ...auditable } = body;
     await writeAuditLog(null, {
       userId: currentAdmin?.id,
       userName: adminProfile?.full_name,
       action: 'UPDATE_STAFF_USER',
       entityType: 'user_profile',
       entityId: id,
-      changes: body,
+      changes: password ? { ...auditable, passwordChanged: true } : auditable,
       request,
     });
 
