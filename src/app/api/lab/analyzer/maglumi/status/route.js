@@ -28,7 +28,8 @@ export async function GET(request) {
 
     // ── Analyzer connection status ──
     const [analyzer] = await query(
-      `SELECT status, last_ping, health_score, temperature, reagent_level, qc_status
+      `SELECT status, last_ping, health_score, temperature, reagent_level, qc_status,
+              protocol, port, ip_address, com_port, baud_rate
        FROM analyzer_connections WHERE id = 'maglumi800' LIMIT 1`
     );
 
@@ -179,6 +180,70 @@ export async function GET(request) {
       // fallback
     }
 
+    /* ── LIS link ────────────────────────────────────────────────────────────
+     * Commissioning detail rather than clinical detail, but it is the first
+     * thing anyone needs when results are not arriving: which port we are
+     * listening on, when the analyzer last said anything, and whether what it
+     * sent could be matched to an order. The instrument's own target IP/port is
+     * set inside its Lis.exe screen and is not readable from here — the vendor
+     * config files are encrypted — so the values below are OUR side of the link.
+     * ─────────────────────────────────────────────────────────────────────── */
+    let link = {
+      protocol: analyzer?.protocol || 'HL7 v2 over TCP',
+      port: analyzer?.port || '2576',
+      ipAddress: analyzer?.ip_address && analyzer.ip_address !== '-' ? analyzer.ip_address : null,
+      comPort: analyzer?.com_port && analyzer.com_port !== '-' ? analyzer.com_port : null,
+      baudRate: analyzer?.baud_rate || null,
+      framing: 'auto (MLLP / HP-Socket PACK / unframed)',
+      ackMode: 'off — Snibe sends MSH-15/16 = NE, so no ACK is expected',
+      lastMessageAt: null,
+      lastMessageStatus: null,
+    };
+    let messageStats = { received: 0, applied: 0, unmatched: 0, error: 0, duplicate: 0 };
+    let rawMessages = [];
+    try {
+      const [last] = await query(
+        `SELECT created_at, status FROM lab_analyzer_messages
+         WHERE analyzer_id = 'maglumi800' ORDER BY created_at DESC LIMIT 1`
+      );
+      if (last) {
+        link.lastMessageAt = last.created_at;
+        link.lastMessageStatus = last.status;
+      }
+
+      const statRows = await query(
+        `SELECT status, COUNT(*) AS cnt FROM lab_analyzer_messages
+         WHERE analyzer_id = 'maglumi800' AND created_at >= (NOW() - INTERVAL 7 DAY)
+         GROUP BY status`
+      );
+      for (const r of statRows) {
+        if (r.status in messageStats) messageStats[r.status] = r.cnt;
+      }
+
+      // Raw traffic, newest first. Truncated in SQL so a histogram-sized payload
+      // cannot bloat the response the panel polls every few seconds.
+      const rawRows = await query(
+        `SELECT id, specimen_id, status, note, tests_count, matched, created_at,
+                LEFT(raw, 2000) AS raw_excerpt, CHAR_LENGTH(raw) AS raw_length
+         FROM lab_analyzer_messages
+         WHERE analyzer_id = 'maglumi800'
+         ORDER BY created_at DESC LIMIT 5`
+      );
+      rawMessages = rawRows.map((r) => ({
+        id: r.id,
+        specimenId: r.specimen_id,
+        status: r.status,
+        note: r.note,
+        testsCount: r.tests_count,
+        matched: !!r.matched,
+        createdAt: r.created_at,
+        raw: r.raw_excerpt,
+        truncated: (r.raw_length || 0) > 2000,
+      }));
+    } catch {
+      // lab_analyzer_messages missing — leave the link block at its defaults
+    }
+
     return Response.json({
       status,
       lastPing,
@@ -190,6 +255,9 @@ export async function GET(request) {
       activeTests,
       recentResults,
       testsToday,
+      link,
+      messageStats,
+      rawMessages,
     });
   } catch (err) {
     console.error('maglumi/status error:', err);

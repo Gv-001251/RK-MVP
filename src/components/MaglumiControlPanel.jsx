@@ -276,6 +276,133 @@ function ResultRow({ result }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
+/* LIS link                                                                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+const MSG_STATUS_COLORS = {
+  applied: '#059669',
+  received: '#0284c7',
+  unmatched: '#d97706',
+  duplicate: '#6b7280',
+  error: '#dc2626',
+};
+
+/**
+ * The interface half of the panel: what we are listening for, and what the
+ * analyzer has actually sent.
+ *
+ * This is here because "no results are coming through" is the failure everyone
+ * hits first, and answering it otherwise means reading bridge logs on the lab
+ * machine. `unmatched` is the number worth watching — it means the Maglumi is
+ * talking to us fine but its barcode does not line up with an open order.
+ *
+ * One thing this cannot show: the IP and port the instrument is dialling. That
+ * lives in its own Lis.exe screen; the vendor's config files on disk are
+ * encrypted, so it has to be read off the instrument and matched to the port below.
+ */
+function LisLinkCard({ link, stats, messages }) {
+  const [showRaw, setShowRaw] = useState(false);
+  if (!link) return null;
+
+  const total = Object.values(stats || {}).reduce((a, b) => a + (b || 0), 0);
+  const field = (label, value, hint) => (
+    <div style={{ minWidth: 130 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>{value || '—'}</div>
+      {hint && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>{hint}</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-primary, #fff)', marginBottom: 20 }}>
+      <SectionHeader title="LIS Link" subtitle="HL7 v2 over TCP — the analyzer connects in to the bridge">
+        <button
+          type="button"
+          onClick={() => setShowRaw((v) => !v)}
+          aria-expanded={showRaw}
+          style={{
+            fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+            border: '1px solid var(--border-color)', background: 'var(--bg-secondary, #f8fafc)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {showRaw ? 'Hide raw HL7' : `Raw HL7 (${messages?.length || 0})`}
+        </button>
+      </SectionHeader>
+
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {field('Protocol', link.protocol)}
+        {field('Listening on', link.port ? `TCP ${link.port}` : '—', 'set this as the LIS port on the instrument')}
+        {field('Framing', 'Auto', 'MLLP · PACK · unframed')}
+        {field('ACK', link.ackMode?.startsWith('off') ? 'Off' : 'On', 'Snibe sends MSH-15 = NE')}
+        {field(
+          'Last message',
+          link.lastMessageAt ? new Date(link.lastMessageAt).toLocaleString() : 'never',
+          link.lastMessageStatus || null,
+        )}
+      </div>
+
+      {total > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+          {Object.entries(stats).filter(([, v]) => v > 0).map(([k, v]) => (
+            <span key={k} style={{
+              fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+              color: '#fff', background: MSG_STATUS_COLORS[k] || '#6b7280',
+            }}>
+              {v} {k}
+            </span>
+          ))}
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', alignSelf: 'center' }}>last 7 days</span>
+        </div>
+      )}
+
+      {link.lastMessageAt === null && (
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '12px 0 0' }}>
+          Nothing received yet. On the instrument, open its LIS screen, choose TCP, and point it at
+          this machine on port {link.port}. Results appear here as soon as the first message lands.
+        </p>
+      )}
+
+      {showRaw && (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {(messages || []).length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>No messages stored yet.</div>
+          ) : messages.map((m) => (
+            <div key={m.id} style={{ border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                padding: '6px 10px', background: 'var(--bg-secondary, #f8fafc)', fontSize: 10,
+              }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {m.specimenId || '(no specimen id)'} · {m.testsCount} result{m.testsCount === 1 ? '' : 's'}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {m.note && <span style={{ color: 'var(--text-muted)' }}>{m.note}</span>}
+                  <span style={{
+                    fontWeight: 700, color: '#fff', borderRadius: 4, padding: '1px 6px',
+                    background: MSG_STATUS_COLORS[m.status] || '#6b7280',
+                  }}>{m.status}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{new Date(m.createdAt).toLocaleTimeString()}</span>
+                </span>
+              </div>
+              <pre style={{
+                margin: 0, padding: '8px 10px', fontSize: 10, lineHeight: 1.5, maxHeight: 160,
+                overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                color: 'var(--text-secondary)', background: 'var(--bg-primary, #fff)',
+              }}>
+                {/* Segments are CR-separated on the wire; split them for reading. */}
+                {String(m.raw || '').split(/\r\n?|\n/).filter(Boolean).join('\n')}
+                {m.truncated ? '\n… truncated' : ''}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 /* Main Panel                                                                */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -290,6 +417,9 @@ export default function MaglumiControlPanel() {
   const [recentResults, setRecentResults] = useState([]);
   const [testsToday, setTestsToday] = useState(0);
   const [lastPing, setLastPing] = useState(null);
+  const [link, setLink] = useState(null);
+  const [messageStats, setMessageStats] = useState(null);
+  const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const mounted = useRef(true);
 
@@ -311,6 +441,9 @@ export default function MaglumiControlPanel() {
       setRecentResults(data.recentResults || []);
       setTestsToday(data.testsToday || 0);
       setLastPing(data.lastPing || null);
+      setLink(data.link || null);
+      setMessageStats(data.messageStats || null);
+      setRawMessages(data.rawMessages || []);
     } catch {
       // Fallback: just fetch basic analyzer status
       try {
@@ -437,6 +570,9 @@ export default function MaglumiControlPanel() {
         <StatCard label="First Result" value={FIRST_RESULT_MIN} unit="min" color="#6b7280" />
       </div>
 
+      {/* ═══════ LIS Link ═══════ */}
+      <LisLinkCard link={link} stats={messageStats} messages={rawMessages} />
+
       {/* ═══════ Main Grid ═══════ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
@@ -520,7 +656,11 @@ export default function MaglumiControlPanel() {
 
       {/* ═══════ Footer Info ═══════ */}
       <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', padding: '0 4px' }}>
-        <span>Serial: COM10 · ASTM E1394 · 9600 8N1 · Bidirectional LIS</span>
+        <span>
+          {link?.comPort
+            ? `Serial: ${link.comPort} · ASTM E1394 · ${link.baudRate || 9600} 8N1`
+            : `${link?.protocol || 'HL7 v2 over TCP'} · listening on TCP ${link?.port || 2576} · framing auto`}
+        </span>
         <span>Last heartbeat: {lastPing ? new Date(lastPing).toLocaleTimeString() : '—'}</span>
       </div>
 

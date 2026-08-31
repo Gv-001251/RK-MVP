@@ -236,7 +236,7 @@ async function watchForBaud(devicePath) {
     const best = await autobaud(devicePath, parseInt(flag('--dwell', '3000'), 10));
     if (best && best.score >= 0.8) {
       console.log(`\n🎉 settled on ${best.baud}. Now run:`);
-      console.log(`   npm run analyzer:maglumi:dry -- --baud ${best.baud}\n`);
+      console.log(`   npm run analyzer:maglumi:serial:dry -- --baud ${best.baud}\n`);
       return best;
     }
     if (best) {
@@ -302,7 +302,7 @@ async function probeBaud(devicePath, dwellMs = parseInt(flag('--dwell', '2000'),
   console.log('');
   if (hit) {
     console.log(`=> ${hit.baud} is the rate. Next:`);
-    console.log(`   npm run analyzer:maglumi:dry -- --baud ${hit.baud}\n`);
+    console.log(`   npm run analyzer:maglumi:serial:dry -- --baud ${hit.baud}\n`);
   } else if (findings.some((f) => f.bytes)) {
     console.log('=> Bytes came back but never a clean ACK. Likely a parity or stop-bit');
     console.log('   mismatch rather than baud. Try --parity even or --stopbits 2.\n');

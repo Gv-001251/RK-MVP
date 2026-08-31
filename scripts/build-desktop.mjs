@@ -189,7 +189,16 @@ if (links.removed.length) log(`  ${links.removed.length} unresolvable link(s) re
  * runtime from node_modules, and because bundling a native module like
  * serialport is not possible anyway.
  */
-const BRIDGES = ['lis-bridge.mjs', 'mispa-bridge.mjs', 'maglumi-bridge.mjs', 'afinion-bridge.mjs'];
+const BRIDGES = [
+  'lis-bridge.mjs',
+  'mispa-bridge.mjs',
+  'maglumi-bridge.mjs',
+  'afinion-bridge.mjs',
+  // The multi-machine bridge, which is how the Maglumi 800 is driven (HL7 over
+  // TCP, per the vendor's own SnibeLis install). It reads config.json beside
+  // itself at runtime, so that file is copied in below.
+  'lis-bridge/bridge.mjs',
+];
 
 fs.rmSync(buildDir, { recursive: true, force: true });
 fs.mkdirSync(path.join(buildDir, 'tools'), { recursive: true });
@@ -202,6 +211,25 @@ for (const name of BRIDGES) {
     '--packages=external', '--minify', '--legal-comments=none',
     `--outfile=${path.join('build', 'tools', name)}`,
   ]);
+}
+
+/**
+ * The multi-machine bridge reads its machine list from config.json next to
+ * itself, so the bundle needs a copy.
+ *
+ * The API key is stripped on the way in. bridge.mjs already falls back to
+ * LIS_ANALYZER_API_KEY from the environment, which is where the installed app
+ * keeps it (%APPDATA%\rk-clinic\.env.local) — and an installer handed to a third
+ * party has no business carrying a live credential inside it.
+ */
+log('copying the bridge machine list (without the API key)');
+{
+  const src = path.join(root, 'tools', 'lis-bridge', 'config.json');
+  const dest = path.join(buildDir, 'tools', 'lis-bridge', 'config.json');
+  const cfg = JSON.parse(fs.readFileSync(src, 'utf8'));
+  if (cfg.lis) delete cfg.lis.apiKey;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, `${JSON.stringify(cfg, null, 2)}\n`);
 }
 
 // The tray icon travels with the bundle, because on Windows an app without one

@@ -230,9 +230,32 @@ function executeCommand(id, command) {
   }
 }
 
+/**
+ * `--only <id>[,<id>…]` restricts this run to named machines.
+ *
+ * Commissioning one analyzer means not opening every other port at the same
+ * time: a COM port that is not there logs reopen failures every few seconds, and
+ * two bridges both binding a TCP port is a silent EADDRINUSE away from results
+ * going to the wrong listener.
+ */
+const onlyIdx = process.argv.indexOf('--only');
+const onlyIds = onlyIdx !== -1 && process.argv[onlyIdx + 1]
+  ? new Set(process.argv[onlyIdx + 1].split(',').map((s) => s.trim()).filter(Boolean))
+  : null;
+if (onlyIds) {
+  const known = new Set((config.machines || []).map((m) => m.id));
+  const unknown = [...onlyIds].filter((id) => !known.has(id));
+  if (unknown.length) {
+    console.error(`--only: no such machine in config: ${unknown.join(', ')}`);
+    console.error(`available: ${[...known].join(', ')}`);
+    process.exit(1);
+  }
+  log(`--only ${[...onlyIds].join(', ')} — other machines in config are skipped`);
+}
+
 // ── Start a driver per configured machine ──
 let started = 0;
-for (const machine of config.machines || []) {
+for (const machine of (config.machines || []).filter((m) => !onlyIds || onlyIds.has(m.id))) {
   machinesById[machine.id] = machine;
   const transport = machine.transport || 'tcp-server';
 

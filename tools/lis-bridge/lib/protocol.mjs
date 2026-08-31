@@ -7,7 +7,11 @@
  */
 
 import { AstmReceiver, parseAstmRecords, parseAstmQuery, buildAstmOrderMessage, AstmSender } from './astm.mjs';
-import { MllpReceiver, parseHl7 } from './hl7.mjs';
+import { Hl7Receiver, parseHl7 } from './hl7.mjs';
+import { applyMaglumiAssayMap } from './maglumi-assays.mjs';
+
+/** Per-machine result-code translators, selected by `"assayMap"` in config.json. */
+const ASSAY_MAPS = { maglumi: applyMaglumiAssayMap };
 
 function proto(machine) {
   return (machine.protocol || 'astm').toLowerCase();
@@ -18,13 +22,23 @@ function isHl7(machine) {
 }
 
 export function makeReceiver(machine, cbs) {
-  if (isHl7(machine)) return new MllpReceiver(cbs);
+  if (isHl7(machine)) {
+    // framing: 'auto' unless the machine pins it; ack stays opt-in per analyzer
+    // because the Hemat 60 wants silence on its link and Snibe sends NE|NE.
+    return new Hl7Receiver({
+      ...cbs,
+      framing: machine.framing || 'auto',
+      ack: !!machine.ack,
+    });
+  }
   return new AstmReceiver(cbs);
 }
 
 export function parseMessage(machine, text) {
-  if (isHl7(machine)) return parseHl7(text);
-  return parseAstmRecords(text);
+  const parsed = isHl7(machine) ? parseHl7(text) : parseAstmRecords(text);
+  const mapper = ASSAY_MAPS[String(machine.assayMap || '').toLowerCase()];
+  if (mapper && Array.isArray(parsed.tests)) parsed.tests = mapper(parsed.tests);
+  return parsed;
 }
 
 /** Detect a host-query frame. HL7 host-query is not implemented yet. */
@@ -88,6 +102,10 @@ export function createConnectionHandler(machine, { write, onMessage, onQuery, on
     feed(buf) {
       if (sender) { sender.feedControl(buf); return; }
       receiver.feed(buf);
+    },
+    /** Release any pending timers when the link closes. */
+    dispose() {
+      if (typeof receiver.dispose === 'function') receiver.dispose();
     },
   };
 }

@@ -1,0 +1,269 @@
+/**
+ * Maglumi 800 / Snibe HL7 tests.
+ *
+ * The message shapes here are not invented — they follow the format strings
+ * lifted from the vendor's own SnibeLis/DllHL7Analysis.dll:
+ *
+ *   MSH|{0}|{1}||{2}||{3}||{4}|{5}|P|{6}|||NE|NE||UTF-8{7}
+ *   PID|1||{0}||{1}||{2}|{3}||||||||||||||{4}||||||||||||||||{5}^{6}{7}
+ *   SPM|1|{0}^{1}^{2}^{6}^{7}||{3}|||||||{4}{5}
+ *   OBR|{0}|||{1}^{2}{3}
+ *   OBX|{0}||{1}||{2}^|{3}|{4}|{5}|||F|||{6}||||{7}|{8}{9}
+ *   NTE|{0}{1}
+ *
+ * The trailing `^` on the OBX value and the timestamp sitting in OBX-14 are the
+ * two details that a generic parser gets wrong, so they are asserted explicitly.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import {
+  Hl7Receiver, parseHl7, buildHl7Ack, frameOutbound, parseHl7Timestamp, FRAMING,
+} from '../tools/lis-bridge/lib/hl7.mjs';
+import { resolveAssay, applyMaglumiAssayMap } from '../tools/lis-bridge/lib/maglumi-assays.mjs';
+
+const CR = '\r';
+
+/** A two-result ORU^R01 in the vendor's exact field layout. */
+const MAGLUMI_ORU = [
+  'MSH|^~\\&|P1^Maglumi||RK_LIS||20260830143000||ORU^R01|MG0000123|P|2.4|||NE|NE||UTF-8',
+  'PID|1||PT0001||DOE^JANE||19900115|F||||||||||||||||||||||||||||||',
+  'SPM|1|SP2026001^^^SER^||SER|||||||',
+  'OBR|1|||TSH^Thyroid Stimulating Hormone',
+  'OBX|1||TSH||2.35^|\u00b5IU/mL|0.35-4.94|N|||F|||20260830142500||||MAG800-01|20260830142800',
+  'OBX|2||25-OH-VD||18.7^|ng/mL|30-100|L|||F|||20260830142500||||MAG800-01|20260830142800',
+  'NTE|1||Sample slightly haemolysed',
+].join(CR) + CR;
+
+const mllp = (text) => Buffer.concat([
+  Buffer.from([0x0b]), Buffer.from(text, 'utf8'), Buffer.from([0x1c, 0x0d]),
+]);
+
+/** HP-Socket PACK framing: 4-byte big-endian length header, then the body. */
+const pack = (text) => {
+  const body = Buffer.from(text, 'utf8');
+  const head = Buffer.alloc(4);
+  head.writeUInt32BE(body.length, 0);
+  return Buffer.concat([head, body]);
+};
+
+function collect(opts = {}) {
+  const messages = [];
+  const written = [];
+  const rx = new Hl7Receiver({
+    onMessage: (t) => messages.push(t),
+    write: (b) => written.push(b),
+    ...opts,
+  });
+  return { rx, messages, written };
+}
+
+describe('parseHl7 — Maglumi field layout', () => {
+  const parsed = parseHl7(MAGLUMI_ORU);
+
+  it('strips the empty trailing component the Maglumi appends to OBX-5', () => {
+    // Read naively this is the string "2.35^", which no numeric range check survives.
+    expect(parsed.tests[0].value).toBe('2.35');
+    expect(parsed.tests[1].value).toBe('18.7');
+  });
+
+  it('reads specimen id from the composite SPM-2', () => {
+    expect(parsed.specimenId).toBe('SP2026001');
+    expect(parsed.specimenType).toBe('SER');
+  });
+
+  it('reads the patient block', () => {
+    expect(parsed.patientName).toBe('DOE JANE');
+    expect(parsed.patientId).toBe('PT0001');
+    expect(parsed.sex).toBe('F');
+    expect(parsed.dob).toBe('1990-01-15 00:00:00');
+  });
+
+  it('keeps unit, reference range and abnormal flag', () => {
+    expect(parsed.tests[0].unit).toBe('\u00b5IU/mL');
+    expect(parsed.tests[0].refRange).toBe('0.35-4.94');
+    expect(parsed.tests[1].flag).toBe('L');
+  });
+
+  it('captures the instrument timestamps from OBX-14 and OBX-19', () => {
+    // Worth having: the analyzers on site have wrong clocks, and this records
+    // what the instrument claimed rather than only when we received it.
+    expect(parsed.tests[0].observedAt).toBe('2026-08-30 14:25:00');
+    expect(parsed.tests[0].analysedAt).toBe('2026-08-30 14:28:00');
+    expect(parsed.tests[0].equipmentId).toBe('MAG800-01');
+    expect(parsed.tests[0].status).toBe('F');
+  });
+
+  it('records message metadata and honours NE|NE as "no ack wanted"', () => {
+    expect(parsed.message.sendingApp).toBe('P1');
+    expect(parsed.message.type).toBe('ORU^R01');
+    expect(parsed.message.controlId).toBe('MG0000123');
+    expect(parsed.message.version).toBe('2.4');
+    expect(parsed.message.ackRequested).toBe(false);
+  });
+
+  it('flags ackRequested when MSH-15 asks for one', () => {
+    const wantsAck = MAGLUMI_ORU.replace('|||NE|NE||UTF-8', '|||AL|NE||UTF-8');
+    expect(parseHl7(wantsAck).message.ackRequested).toBe(true);
+  });
+
+  it('collects NTE comments', () => {
+    expect(parsed.comments).toEqual(['Sample slightly haemolysed']);
+  });
+
+  it('leaves genuinely componentised values alone', () => {
+    const seg = 'OBX|1||CRP||>^100|mg/L|||||F';
+    const msg = `MSH|^~\\&|P1^Maglumi||RK_LIS||20260830143000||ORU^R01|1|P|2.4${CR}${seg}${CR}`;
+    expect(parseHl7(msg).tests[0].value).toBe('>^100');
+  });
+});
+
+describe('Hl7Receiver — framing detection', () => {
+  it('de-frames MLLP', () => {
+    const { rx, messages } = collect();
+    rx.feed(mllp(MAGLUMI_ORU));
+    expect(messages).toHaveLength(1);
+    expect(parseHl7(messages[0]).specimenId).toBe('SP2026001');
+    expect(rx.mode).toBe(FRAMING.MLLP);
+  });
+
+  it('de-frames HP-Socket PACK, which is what SnibeLisSocket4C uses', () => {
+    const { rx, messages } = collect();
+    rx.feed(pack(MAGLUMI_ORU));
+    expect(messages).toHaveLength(1);
+    expect(rx.mode).toBe(FRAMING.PACK);
+    expect(parseHl7(messages[0]).tests).toHaveLength(2);
+  });
+
+  it('reassembles a message split across TCP segments', () => {
+    const { rx, messages } = collect();
+    const framed = mllp(MAGLUMI_ORU);
+    rx.feed(framed.subarray(0, 40));
+    expect(messages).toHaveLength(0);
+    rx.feed(framed.subarray(40));
+    expect(messages).toHaveLength(1);
+  });
+
+  it('handles two messages arriving in one read', () => {
+    const { rx, messages } = collect();
+    rx.feed(Buffer.concat([mllp(MAGLUMI_ORU), mllp(MAGLUMI_ORU)]));
+    expect(messages).toHaveLength(2);
+  });
+
+  it('flushes an unframed message once the link goes quiet', () => {
+    vi.useFakeTimers();
+    try {
+      const { rx, messages } = collect();
+      rx.feed(Buffer.from(MAGLUMI_ORU, 'utf8'));
+      expect(messages).toHaveLength(0);   // nothing delimits it yet
+      vi.advanceTimersByTime(600);
+      expect(messages).toHaveLength(1);
+      expect(rx.mode).toBe(FRAMING.BARE);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('splits back-to-back unframed messages on the next MSH', () => {
+    const { rx, messages } = collect();
+    rx.feed(Buffer.from(MAGLUMI_ORU + MAGLUMI_ORU, 'utf8'));
+    expect(messages).toHaveLength(1); // the first; the tail waits for the idle flush
+  });
+
+  it('decodes UTF-8 as declared in MSH-18 rather than latin1', () => {
+    const { rx, messages } = collect();
+    rx.feed(mllp(MAGLUMI_ORU));
+    expect(messages[0]).toContain('\u00b5IU/mL');
+    expect(messages[0]).not.toContain('\u00c2\u00b5');
+  });
+
+  it('stays silent by default and ACKs only when asked', () => {
+    const quiet = collect();
+    quiet.rx.feed(mllp(MAGLUMI_ORU));
+    expect(quiet.written).toHaveLength(0);
+
+    const acking = collect({ ack: true });
+    acking.rx.feed(mllp(MAGLUMI_ORU));
+    expect(acking.written).toHaveLength(1);
+    expect(acking.written[0][0]).toBe(0x0b); // framed the same way it arrived
+  });
+});
+
+describe('buildHl7Ack', () => {
+  const ack = buildHl7Ack(MAGLUMI_ORU);
+
+  it('echoes the control id in MSA-2 and accepts with AA', () => {
+    expect(ack).toContain('MSA|AA|MG0000123');
+  });
+
+  it('swaps the application fields and mirrors the trigger event', () => {
+    const msh = ack.split(CR)[0].split('|');
+    expect(msh[2]).toBe('RK_LIS'); // MSH-3 is now us
+    expect(msh[4]).toBe('P1');     // MSH-5 is the analyzer
+    expect(msh[8]).toBe('ACK^R01');
+    expect(msh[11]).toBe('2.4');
+  });
+
+  it('can send CA instead, for senders that insist on commit-accept', () => {
+    expect(buildHl7Ack(MAGLUMI_ORU, { code: 'CA' })).toContain('MSA|CA|');
+  });
+});
+
+describe('frameOutbound', () => {
+  it('wraps in MLLP by default', () => {
+    const out = frameOutbound('MSH|test\r');
+    expect(out[0]).toBe(0x0b);
+    expect(out[out.length - 2]).toBe(0x1c);
+    expect(out[out.length - 1]).toBe(0x0d);
+  });
+
+  it('prefixes a length header in PACK mode', () => {
+    const out = frameOutbound('MSH|test\r', FRAMING.PACK);
+    expect(out.readUInt32BE(0)).toBe(out.length - 4);
+  });
+});
+
+describe('parseHl7Timestamp', () => {
+  it('handles full and partial precision', () => {
+    expect(parseHl7Timestamp('20260830142500')).toBe('2026-08-30 14:25:00');
+    expect(parseHl7Timestamp('20260830')).toBe('2026-08-30 00:00:00');
+    expect(parseHl7Timestamp('')).toBeNull();
+    expect(parseHl7Timestamp(null)).toBeNull();
+  });
+});
+
+describe('Maglumi assay map', () => {
+  it('resolves codes regardless of punctuation or case', () => {
+    expect(resolveAssay('25-OH-VD').catalogName).toBe('Vitamin D (25-OH)');
+    expect(resolveAssay('25ohvd').catalogName).toBe('Vitamin D (25-OH)');
+    expect(resolveAssay('tsh').catalogName).toBe('TSH');
+    expect(resolveAssay('CA19-9').catalogName).toBe('CA 19-9');
+  });
+
+  it('folds the Greek beta used in hCG naming', () => {
+    expect(resolveAssay('\u03b2-hCG').catalogName).toBe('Beta hCG');
+    expect(resolveAssay('B-HCG').catalogName).toBe('Beta hCG');
+  });
+
+  it('renames mapped results and keeps the reported code for audit', () => {
+    const [vd] = applyMaglumiAssayMap([{ code: '25-OH-VD', value: '18.7', unit: 'ng/mL' }]);
+    expect(vd.code).toBe('Vitamin D (25-OH)');
+    expect(vd.reportedCode).toBe('25-OH-VD');
+    expect(vd.mapped).toBe(true);
+  });
+
+  it('prefers the unit the analyzer sent over the table', () => {
+    const [tsh] = applyMaglumiAssayMap([{ code: 'TSH', value: '2.35', unit: 'mIU/L' }]);
+    expect(tsh.unit).toBe('mIU/L');
+  });
+
+  it('fills in a unit only when the analyzer sent none', () => {
+    const [tsh] = applyMaglumiAssayMap([{ code: 'TSH', value: '2.35', unit: '' }]);
+    expect(tsh.unit).toBe('\u00b5IU/mL');
+  });
+
+  it('passes unmapped codes through untouched rather than dropping them', () => {
+    const [x] = applyMaglumiAssayMap([{ code: 'NEW-ASSAY-2027', value: '5' }]);
+    expect(x.code).toBe('NEW-ASSAY-2027');
+    expect(x.mapped).toBe(false);
+  });
+});

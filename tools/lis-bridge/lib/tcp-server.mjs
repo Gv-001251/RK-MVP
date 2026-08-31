@@ -29,7 +29,11 @@ export function startTcpServer(machine, { onMessage, onStatus, onQuery, log }) {
       try { conn.feed(buf); }
       catch (e) { logf(`[${machine.id}] parse error: ${e.message}`); }
     });
-    sock.on('close', () => { logf(`[${machine.id}] analyzer disconnected ${peer}`); status(false); });
+    sock.on('close', () => {
+      conn.dispose?.();
+      logf(`[${machine.id}] analyzer disconnected ${peer}`);
+      status(false);
+    });
     sock.on('error', (e) => logf(`[${machine.id}] socket error: ${e.message}`));
   });
 

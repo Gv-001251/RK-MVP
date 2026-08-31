@@ -37,6 +37,18 @@
       "watchdogMs": 0
     },
     {
+      "id": "maglumi800",
+      "name": "Snibe Maglumi 800 (Immunoassay)",
+      "transport": "tcp-server",
+      "port": 2576,
+      "protocol": "hl7",
+      "framing": "auto",
+      "ack": false,
+      "assayMap": "maglumi",
+      "reconnectMs": 5000,
+      "watchdogMs": 0
+    },
+    {
       "id": "wondfo",
       "name": "Wondfo Rapid (POCT)",
       "transport": "tcp-server",
