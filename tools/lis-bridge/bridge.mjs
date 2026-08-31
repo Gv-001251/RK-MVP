@@ -25,6 +25,20 @@ import { startSerial } from './lib/serial.mjs';
 import { parseMessage, detectQuery, buildOrderResponse } from './lib/protocol.mjs';
 import { createForwarder } from './lib/forwarder.mjs';
 import { createReporter } from './lib/reporter.mjs';
+import dotenv from 'dotenv';
+
+/**
+ * The API key comes from the environment, matching tools/lis-bridge.mjs and
+ * tools/maglumi-bridge.mjs.
+ *
+ * Without this, running from a checkout left LIS_ANALYZER_API_KEY unset and the
+ * bridge fell back to whatever was written into config.json — which had drifted
+ * out of step with .env.local, so every result was posted with a key the LIS no
+ * longer accepted. The installed app is unaffected either way: its supervisor
+ * injects the environment directly and the bundled config carries no key at all.
+ */
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = (m) => console.log(`[${new Date().toISOString()}] ${m}`);

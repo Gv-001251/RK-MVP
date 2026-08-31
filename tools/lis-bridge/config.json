@@ -1,8 +1,8 @@
 {
+  "_apiKey": "Deliberately absent. The key is read from LIS_ANALYZER_API_KEY (.env.local in a checkout; injected by the service supervisor in the installed app), so there is exactly one copy of it and it is never committed.",
   "lis": {
     "endpoint": "http://localhost:3000/api/lab/analyzer/results",
-    "hostQueryEndpoint": "http://localhost:3000/api/lab/host-query",
-    "apiKey": "fb4df1a6aa69334d175dab4fd9afd9e76ef31da84d5e66eebef30e74f952ca3c"
+    "hostQueryEndpoint": "http://localhost:3000/api/lab/host-query"
   },
   "queueDir": "./.queue",
   "machines": [
