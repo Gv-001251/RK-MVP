@@ -67,3 +67,7 @@ install-kit/
 /Maglumi 800/
 /Maglumi 800_*.exe
 /SnibeLis/
+
+# Copied into the share site by scripts/share-installer.mjs on every run. The
+# original is deploy/setup-windows.ps1; this is a build artifact of the deploy.
+/deploy/share-site/setup-windows.ps1
