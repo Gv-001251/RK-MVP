@@ -1,6 +1,6 @@
 {
   "name": "rk-clinic",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "description": "RK Clinic LIS — hospital information system with direct analyzer integration",
   "author": "RK Clinic",
