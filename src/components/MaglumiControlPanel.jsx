@@ -61,6 +61,44 @@ function SectionHeader({ title, subtitle, children }) {
   );
 }
 
+/**
+ * Says where a section's numbers come from.
+ *
+ * The Maglumi reports results and answers order queries over HL7; it does not
+ * send reagent, incubator or carousel state, and its RFID tag data never crosses
+ * the LIS link. Those panels are therefore seeded, derived or LIS-side — which is
+ * fine as long as nobody reads them as live instrument telemetry. A reagent tile
+ * showing "22 remaining, valid" is exactly the kind of thing that gets trusted on
+ * a bench, so it gets labelled rather than quietly left to imply freshness.
+ */
+const PROVENANCE = {
+  instrument: { text: 'LIVE',            bg: '#dcfce7', fg: '#15803d', border: '#bbf7d0',
+                title: 'Reported by the analyzer over the LIS link.' },
+  unavailable: { text: 'NOT REPORTED',   bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca',
+                 title: 'The analyzer does not send this over the LIS link (HL7 carries results and order queries only). Shown values are placeholders, not live instrument state.' },
+  derived:     { text: 'DERIVED',        bg: '#fffbeb', fg: '#b45309', border: '#fde68a',
+                 title: 'Estimated by the LIS from task counts, not reported by the analyzer.' },
+  lis:         { text: 'LIS-ASSIGNED',   bg: '#eff6ff', fg: '#1d4ed8', border: '#bfdbfe',
+                 title: 'What the LIS assigned. It does not confirm what is physically loaded on the instrument.' },
+};
+
+function ProvenanceBadge({ kind }) {
+  const p = PROVENANCE[kind];
+  if (!p) return null;
+  return (
+    <span
+      title={p.title}
+      style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: '0.04em', padding: '3px 7px',
+        borderRadius: 4, background: p.bg, color: p.fg, border: `1px solid ${p.border}`,
+        whiteSpace: 'nowrap', cursor: 'help',
+      }}
+    >
+      {p.text}
+    </span>
+  );
+}
+
 function StatCard({ label, value, unit, color }) {
   return (
     <div style={{
@@ -177,13 +215,17 @@ function SamplePosition({ pos, data }) {
 /* Incubator Visualization                                                   */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
-function IncubatorView({ slots, temperature }) {
+function IncubatorView({ slots, temperature, provenance }) {
   const activeCount = slots.filter(s => s.active).length;
   const tempOk = temperature >= TARGET_TEMP - 0.5 && temperature <= TARGET_TEMP + 0.5;
 
   return (
     <div style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-primary, #fff)' }}>
-      <SectionHeader title="Incubator" subtitle={`${activeCount}/${INCUBATOR_SLOTS} slots active (${activeCount * TESTS_PER_SLOT} tests)`}>
+      <SectionHeader
+        title="Incubator"
+        subtitle={`${activeCount}/${INCUBATOR_SLOTS} slots — estimated from running tasks, not read from the instrument`}
+      >
+        <ProvenanceBadge kind={provenance?.incubator || 'derived'} />
         <div style={{
           padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
           background: tempOk ? '#f0fdf4' : '#fef2f2',
@@ -418,6 +460,7 @@ export default function MaglumiControlPanel() {
   const [testsToday, setTestsToday] = useState(0);
   const [lastPing, setLastPing] = useState(null);
   const [link, setLink] = useState(null);
+  const [provenance, setProvenance] = useState(null);
   const [messageStats, setMessageStats] = useState(null);
   const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -442,6 +485,7 @@ export default function MaglumiControlPanel() {
       setTestsToday(data.testsToday || 0);
       setLastPing(data.lastPing || null);
       setLink(data.link || null);
+      setProvenance(data.provenance || null);
       setMessageStats(data.messageStats || null);
       setRawMessages(data.rawMessages || []);
     } catch {
@@ -550,12 +594,25 @@ export default function MaglumiControlPanel() {
           }}>
             {mode} Mode
           </div>
-          <div style={{
-            padding: '5px 12px', borderRadius: 6,
-            background: temperature >= TARGET_TEMP - 0.5 && temperature <= TARGET_TEMP + 0.5 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
-            color: '#fff', fontSize: 12, fontWeight: 600,
-          }}>
+          {/* The instrument does not send its incubator temperature over HL7, so
+              unless something actually reported it this is the nominal 36.8 °C
+              rather than a reading. Say which. */}
+          <div
+            title={provenance?.temperature === 'instrument'
+              ? 'Reported by the analyzer.'
+              : 'Nominal value — the analyzer does not report temperature over the LIS link.'}
+            style={{
+              padding: '5px 12px', borderRadius: 6,
+              background: provenance && provenance.temperature !== 'instrument'
+                ? 'rgba(255,255,255,0.15)'
+                : (temperature >= TARGET_TEMP - 0.5 && temperature <= TARGET_TEMP + 0.5 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'),
+              color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'help',
+            }}
+          >
             {temperature.toFixed(1)}°C
+            {provenance && provenance.temperature !== 'instrument' && (
+              <span style={{ opacity: 0.75, marginLeft: 5, fontWeight: 500 }}>nominal</span>
+            )}
           </div>
         </div>
       </div>
@@ -581,10 +638,11 @@ export default function MaglumiControlPanel() {
 
           {/* Reagent Area */}
           <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-primary, #fff)' }}>
-            <SectionHeader title="Reagent Area" subtitle="9 on-board · RFID auto-read · Refrigerated">
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '3px 8px', borderRadius: 4, border: '1px solid #e9d5ff' }}>
-                RFID
-              </span>
+            <SectionHeader
+              title="Reagent Area"
+              subtitle="9 on-board · RFID is read by the instrument, not sent to the LIS"
+            >
+              <ProvenanceBadge kind={provenance?.reagents || 'unavailable'} />
             </SectionHeader>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {reagents.map((r, i) => <ReagentSlot key={i} slot={i + 1} data={r} />)}
@@ -592,7 +650,7 @@ export default function MaglumiControlPanel() {
           </div>
 
           {/* Incubator */}
-          <IncubatorView slots={incubatorSlots} temperature={temperature} />
+          <IncubatorView slots={incubatorSlots} temperature={temperature} provenance={provenance} />
         </div>
 
         {/* ─── Right Column ─── */}
@@ -600,10 +658,11 @@ export default function MaglumiControlPanel() {
 
           {/* Sample Area */}
           <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-primary, #fff)' }}>
-            <SectionHeader title="Sample Area" subtitle="40 positions · Continuous loading · Barcode reader · Refrigerated">
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#0891b2', background: '#ecfeff', padding: '3px 8px', borderRadius: 4, border: '1px solid #a5f3fc' }}>
-                COOLED
-              </span>
+            <SectionHeader
+              title="Sample Area"
+              subtitle="40 positions · positions as assigned by the LIS, not read from the carousel"
+            >
+              <ProvenanceBadge kind={provenance?.samples || 'lis'} />
             </SectionHeader>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 4 }}>
               {samples.map((s, i) => <SamplePosition key={i} pos={i + 1} data={s} />)}

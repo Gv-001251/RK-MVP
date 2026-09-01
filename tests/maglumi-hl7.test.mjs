@@ -18,6 +18,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   Hl7Receiver, parseHl7, buildHl7Ack, frameOutbound, parseHl7Timestamp, FRAMING,
+  detectHl7Query, buildHl7OrderResponse,
 } from '../tools/lis-bridge/lib/hl7.mjs';
 import { resolveAssay, applyMaglumiAssayMap } from '../tools/lis-bridge/lib/maglumi-assays.mjs';
 
@@ -265,5 +266,102 @@ describe('Maglumi assay map', () => {
     const [x] = applyMaglumiAssayMap([{ code: 'NEW-ASSAY-2027', value: '5' }]);
     expect(x.code).toBe('NEW-ASSAY-2027');
     expect(x.mapped).toBe(false);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Host query (order download)
+ *
+ * QPD/RCP are the segments Snibe's DllHL7Analysis.dll builds, and they belong to
+ * QBP^Q11 in v2.4 — so that is the request shape asserted here, answered with
+ * RSP^K11. QRY^Q02 (QRD/QRF) is a different dialect and is deliberately detected
+ * but not answered.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const QBP_QUERY = [
+  'MSH|^~\\&|P1^Maglumi||RK_LIS||20260830143000||QBP^Q11|MG0000900|P|2.4',
+  'QPD|WOS^Work Order Segment|QT001|SP2026001^SER',
+  'RCP|1||R',
+].join(CR) + CR;
+
+describe('detectHl7Query', () => {
+  it('recognises QBP^Q11 and reads the specimen from QPD-3', () => {
+    const q = detectHl7Query(QBP_QUERY);
+    expect(q.isQuery).toBe(true);
+    expect(q.supported).toBe(true);
+    expect(q.specimenId).toBe('SP2026001');
+    expect(q.queryTag).toBe('QT001');
+    expect(q.queryName).toBe('WOS^Work Order Segment');
+    expect(q.controlId).toBe('MG0000900');
+  });
+
+  it('does not mistake a result message for a query', () => {
+    expect(detectHl7Query(MAGLUMI_ORU).isQuery).toBe(false);
+  });
+
+  it('detects the older QRY^Q02 dialect but refuses to guess at answering it', () => {
+    const qry = [
+      'MSH|^~\\&|P1^Maglumi||RK_LIS||20260830143000||QRY^Q02|MG0000901|P|2.4',
+      'QRD|20260830143000|R|I|QT002|||1^RD|SP2026001|OTH',
+    ].join(CR) + CR;
+    const q = detectHl7Query(qry);
+    expect(q.isQuery).toBe(true);
+    expect(q.supported).toBe(false);
+    expect(q.specimenId).toBe('SP2026001');
+  });
+
+  it('falls back to SPM-2 when the query carries no QPD-3', () => {
+    const q = detectHl7Query([
+      'MSH|^~\\&|P1^Maglumi||RK_LIS||20260830143000||QBP^Q11|MG1|P|2.4',
+      'QPD|WOS|QT9|',
+      'SPM|1|SP-FALLBACK^^^SER^||SER',
+    ].join(CR) + CR);
+    expect(q.specimenId).toBe('SP-FALLBACK');
+  });
+});
+
+describe('buildHl7OrderResponse', () => {
+  const query = detectHl7Query(QBP_QUERY);
+
+  it('answers OK with one ORC/OBR pair per ordered test', () => {
+    const rsp = buildHl7OrderResponse(query, {
+      specimenId: 'SP2026001',
+      patientName: 'Jane Doe',
+      patientId: 'PT0001',
+      sex: 'F',
+      tests: [{ code: 'TSH', name: 'TSH' }, { code: 'FT4', name: 'Free T4' }],
+    });
+    expect(rsp).toContain('MSH|^~\\&|RK_LIS||P1||');
+    expect(rsp).toContain('RSP^K11');
+    expect(rsp).toContain('MSA|AA|MG0000900');
+    expect(rsp).toContain('QAK|QT001|OK|');
+    expect(rsp).toContain('PID|1||PT0001||Jane^Doe');
+    expect(rsp).toContain('SPM|1|SP2026001');
+    expect((rsp.match(/\rORC\|NW\|/g) || []).length).toBe(2);
+    expect(rsp).toContain('OBR|1|SP2026001||TSH|R');
+    expect(rsp).toContain('OBR|2|SP2026001||FT4^Free T4|R');
+  });
+
+  it('answers NF when the tube has no open order, rather than staying silent', () => {
+    const rsp = buildHl7OrderResponse(query, { specimenId: 'SP2026001', tests: [] });
+    expect(rsp).toContain('QAK|QT001|NF|');
+    expect(rsp).not.toContain('ORC|');
+    expect(rsp).not.toContain('OBR|');
+  });
+
+  it('marks an urgent order S in OBR-5', () => {
+    const rsp = buildHl7OrderResponse(query, {
+      specimenId: 'SP1', priority: 'urgent', tests: [{ code: 'TNI' }],
+    });
+    expect(rsp).toContain('OBR|1|SP1||TNI|S');
+  });
+
+  it('produces a message our own parser can read back', () => {
+    const rsp = buildHl7OrderResponse(query, {
+      specimenId: 'SP2026001', tests: [{ code: 'TSH' }],
+    });
+    const back = parseHl7(rsp);
+    expect(back.message.type).toBe('RSP^K11');
+    expect(back.specimenId).toBe('SP2026001');
   });
 });

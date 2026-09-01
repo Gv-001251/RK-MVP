@@ -258,6 +258,26 @@ export async function GET(request) {
       link,
       messageStats,
       rawMessages,
+      /**
+       * Where each panel's numbers actually come from.
+       *
+       * HL7 over TCP carries results and order queries — Snibe's segment set
+       * (MSH/PID/SPM/ORC/OBR/OBX/NTE/QPD/RCP) has no reagent, incubator or
+       * carousel message, and RFID tag data never crosses the LIS link at all.
+       * It lives in the instrument's own software. So the reagent slots below are
+       * seeded rows, the incubator is derived from a task count, and the sample
+       * grid reflects what the LIS assigned rather than what is physically
+       * loaded. The UI labels each one, because a slot reading "22 remaining,
+       * valid" looks like live inventory and is not.
+       */
+      provenance: {
+        results: 'instrument',
+        connection: 'instrument',
+        temperature: analyzer?.temperature != null ? 'instrument' : 'unavailable',
+        reagents: 'unavailable',
+        incubator: 'derived',
+        samples: 'lis',
+      },
     });
   } catch (err) {
     console.error('maglumi/status error:', err);

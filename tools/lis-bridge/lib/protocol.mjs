@@ -7,7 +7,9 @@
  */
 
 import { AstmReceiver, parseAstmRecords, parseAstmQuery, buildAstmOrderMessage, AstmSender } from './astm.mjs';
-import { Hl7Receiver, parseHl7 } from './hl7.mjs';
+import {
+  Hl7Receiver, parseHl7, detectHl7Query, buildHl7OrderResponse, frameOutbound,
+} from './hl7.mjs';
 import { applyMaglumiAssayMap } from './maglumi-assays.mjs';
 
 /** Per-machine result-code translators, selected by `"assayMap"` in config.json. */
@@ -41,15 +43,23 @@ export function parseMessage(machine, text) {
   return parsed;
 }
 
-/** Detect a host-query frame. HL7 host-query is not implemented yet. */
+/** Detect a host-query frame. */
 export function detectQuery(machine, text) {
-  if (isHl7(machine)) return { isQuery: false, specimenId: null };
+  if (isHl7(machine)) return detectHl7Query(text);
   return parseAstmQuery(text);
 }
 
-/** Build the protocol-specific order-response records for a host-query. */
-export function buildOrderResponse(machine, order) {
-  if (isHl7(machine)) return null; // not supported yet
+/**
+ * Build the protocol-specific order response for a host-query.
+ *
+ * ASTM returns records for the send handshake; HL7 returns a finished message to
+ * write straight back on the socket, since MLLP has no handshake to drive.
+ */
+export function buildOrderResponse(machine, order, query = null) {
+  if (isHl7(machine)) {
+    if (!query || !query.supported) return null;
+    return { hl7: buildHl7OrderResponse(query, order) };
+  }
   return buildAstmOrderMessage(order);
 }
 
@@ -85,6 +95,16 @@ export function createConnectionHandler(machine, { write, onMessage, onQuery, on
       let resp = null;
       try { resp = await onQuery(text); }
       catch (e) { logf(`host-query handler error: ${e.message}`); }
+      // HL7: one message, written back in whatever framing the analyzer used.
+      if (resp && resp.hl7) {
+        try {
+          write(frameOutbound(resp.hl7, receiver.mode || 'mllp'));
+          logf('tx host-query response');
+        } catch (e) {
+          logf(`host-query response write failed: ${e.message}`);
+        }
+        return;
+      }
       if (resp && Array.isArray(resp.records) && resp.records.length) {
         const s = makeSender(machine, {
           write,

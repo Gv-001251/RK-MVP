@@ -122,8 +122,21 @@ async function handleQuery(machine, text) {
     }
   }
 
-  const records = buildOrderResponse(machine, order);
-  return records ? { records } : null;
+  // An HL7 query is answered even when nothing was found: QAK-2 = NF tells the
+  // analyzer there is no order for that tube, which is what stops it waiting on
+  // a reply that never arrives. ASTM keeps its previous behaviour of replying
+  // only when there is something to say.
+  const resp = buildOrderResponse(machine, order, q);
+  if (!resp) {
+    if (q.isQuery && !q.supported) {
+      log(`[${machine.id}] host-query dialect not supported (${q.messageType}) — `
+        + 'raw message follows so it can be added');
+      log(`[${machine.id}] ${JSON.stringify(text)}`);
+    }
+    return null;
+  }
+  if (resp.hl7) return { hl7: resp.hl7 };
+  return Array.isArray(resp) && resp.length ? { records: resp } : null;
 }
 
 const ACTIVE_WINDOW_MS = 30000; // "active" if it transmitted within this window

@@ -406,3 +406,127 @@ export function buildHl7Ack(received, { code = 'AA', text = '' } = {}) {
   ];
   return `${segments.join('\r')}\r`;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Host query — order download
+ *
+ * The other half of a bidirectional link, and the piece the vendor's own LIS
+ * does that ours did not: the analyzer reads a barcode, asks the LIS what to run
+ * on that tube, and starts only the ordered assays. Without it every sample has
+ * to be programmed by hand at the instrument, and a tube whose worklist nobody
+ * typed in simply does not get tested.
+ *
+ * Snibe's DllHL7Analysis.dll carries QPD and RCP builders:
+ *
+ *     QPD|{0}||{1}^{2}|{3}{4}
+ *     RCP|1||R|{0}
+ *
+ * QPD and RCP belong to QBP^Q11 in HL7 v2.4, so that is the dialect implemented
+ * here, answered with RSP^K11. The older QRY^Q02 form uses QRD/QRF instead and
+ * is deliberately NOT guessed at — it is detected and reported so the raw
+ * message can be read, because shipping an unverified second dialect would just
+ * fail in a harder-to-diagnose way.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Message types that are asking us a question rather than telling us a result. */
+const QUERY_TYPES = /^(QBP|QRY|QCK)\b/i;
+
+/**
+ * Recognise a query and pull the specimen out of it.
+ *
+ * The specimen is looked for in several places because the field it lands in
+ * varies by dialect: QPD-3 is where QBP^Q11 puts it, but instruments have been
+ * seen putting it in SPM-2 or OBR-3, and QRY^Q02 uses QRD-8.
+ */
+export function detectHl7Query(text) {
+  const parsed = parseHl7(text);
+  const type = parsed.message.type || '';
+  const none = { isQuery: false, specimenId: null };
+  if (!QUERY_TYPES.test(type)) return none;
+
+  const segments = String(text).split(/[\r\n]+/).map((s) => s.trim()).filter(Boolean);
+  const fieldSep = (segments.find((s) => s.startsWith('MSH')) || 'MSH|').charAt(3) || '|';
+  const seg = (name) => {
+    const line = segments.find((l) => l.toUpperCase().startsWith(`${name}${fieldSep}`));
+    return line ? line.split(fieldSep) : null;
+  };
+  const comp = (v) => (v ? String(v).split('^').find((c) => c && c.trim()) || '' : '').trim();
+
+  const qpd = seg('QPD');
+  const qrd = seg('QRD');
+  const spm = seg('SPM');
+  const obr = seg('OBR');
+
+  const specimenId =
+    comp(qpd?.[3]) ||        // QBP^Q11: QPD-3
+    comp(qrd?.[8]) ||        // QRY^Q02: QRD-8
+    parsed.specimenId ||     // SPM-2 / OBR-3 via the normal parser
+    comp(spm?.[2]) ||
+    comp(obr?.[3]) ||
+    null;
+
+  return {
+    isQuery: true,
+    specimenId,
+    messageType: type,
+    // Echoed back in QAK-1 and QPD-2 so the analyzer can pair reply to request.
+    queryTag: (qpd?.[2] || '').trim() || null,
+    queryName: (qpd?.[1] || '').trim() || 'WOS^Work Order Segment',
+    controlId: parsed.message.controlId,
+    sendingApp: parsed.message.sendingApp,
+    receivingApp: parsed.message.receivingApp,
+    version: parsed.message.version || '2.4',
+    // QBP is the dialect we answer; anything else is recognised but not answered.
+    supported: /^QBP/i.test(type),
+  };
+}
+
+/**
+ * Build the RSP^K11 answer to a QBP^Q11 work-order query.
+ *
+ * QAK-2 is the field that matters most to the instrument: OK means "here is the
+ * worklist", NF means "no order for this tube". Returning NF explicitly is what
+ * stops the analyzer waiting on a reply that never comes, so an unmatched
+ * barcode is answered rather than ignored.
+ */
+export function buildHl7OrderResponse(query, order = {}) {
+  const {
+    queryTag, queryName, controlId, sendingApp, version,
+  } = query || {};
+  const tests = Array.isArray(order.tests) ? order.tests : [];
+  const found = tests.length > 0;
+  const specimenId = order.specimenId || query?.specimenId || '';
+  const stamp = stampNow();
+
+  const segments = [
+    `MSH|^~\\&|RK_LIS||${sendingApp || ''}||${stamp}||RSP^K11|${stamp}|P|${version || '2.4'}`,
+    `MSA|AA|${controlId || ''}`,
+    `QAK|${queryTag || ''}|${found ? 'OK' : 'NF'}|${queryName || ''}`,
+    `QPD|${queryName || ''}|${queryTag || ''}|${specimenId}`,
+  ];
+
+  if (found) {
+    // Patient identity is optional in a work-order reply, but sending it means
+    // the result that comes back carries the name the LIS already knows rather
+    // than whatever was typed at the instrument.
+    const nameComponents = String(order.patientName || '').trim().replace(/\s+/g, '^');
+    if (order.patientId || nameComponents) {
+      segments.push(`PID|1||${order.patientId || ''}||${nameComponents}|||${order.sex || ''}`);
+    }
+    segments.push(`SPM|1|${specimenId}||${order.specimenType || ''}`);
+
+    let n = 1;
+    for (const t of tests) {
+      const code = (t && (t.code || t.name)) || '';
+      if (!code) continue;
+      const label = (t && t.name && t.name !== code) ? t.name : '';
+      // ORC-1 = NW (new order); OBR-4 carries the assay the analyzer should run.
+      segments.push(`ORC|NW|${specimenId}`);
+      segments.push(`OBR|${n}|${specimenId}||${code}${label ? `^${label}` : ''}`
+        + `|${order.priority === 'urgent' || order.priority === 'STAT' ? 'S' : 'R'}`);
+      n += 1;
+    }
+  }
+
+  return `${segments.join('\r')}\r`;
+}
