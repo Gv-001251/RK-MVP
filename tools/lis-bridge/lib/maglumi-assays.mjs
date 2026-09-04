@@ -1,14 +1,30 @@
 /**
  * Maglumi 800 (Snibe) assay code map.
  *
- * ── Status: provisional ─────────────────────────────────────────────────────
- * The codes below are the Snibe assay menu short names. They are NOT read from
- * this instrument's own configuration: SnibeLis/config/fieldlayoutconfig.lis and
- * Maglumi 800/config/*.nii are encrypted with the vendor's CryptoAPI key
- * (NIICrypt.dll → CryptDeriveKey/CryptDecrypt), so the on-site test dictionary
- * cannot be read off disk. Treat this table as a starting point and correct it
- * against the first real capture — `analyzer_id = 'maglumi800'` rows in
- * lab_analyzer_messages keep the raw message for exactly this purpose.
+ * ── Status: partly confirmed against the instrument ─────────────────────────
+ * Entries marked ✓ are confirmed present on the site's own analyzer, read from
+ * the assay definitions it ships in `Maglumi 800/assay/*.asy` and cross-checked
+ * against its calibration history (`Maglumi 800/report/newreport.nii`, a SQLite
+ * database behind a .nii extension). Matching calibration timestamps to those
+ * files identifies four of them outright: assayid 587 = TSH II, 314 = FT3 II,
+ * 315 = FT4 II, 313 = TT4 II.
+ *
+ * That exercise found a real defect. This instrument's kits are second
+ * generation, so its assay names carry a " II" suffix — "TSH II", "25-OH VD II",
+ * "Vit B12 II". The table originally held only brochure short names, and as a
+ * result EVERY assay on this analyzer failed to resolve. normalise() now drops a
+ * trailing generation marker and the real names are listed as aliases.
+ *
+ * Still unconfirmed: the remaining unmarked entries, which are brochure names for
+ * assays this site does not currently run. And three menu items are deliberately
+ * left unmapped — BGW, LC-le and LC-ri appear to be optical/system checks rather
+ * than patient assays, so they are allowed to pass through under their own labels
+ * instead of being given invented clinical names.
+ *
+ * The encrypted files remain unreadable: SnibeLis/config/fieldlayoutconfig.lis
+ * and Maglumi 800/config/*.nii use the vendor's CryptoAPI key (NIICrypt.dll →
+ * CryptDeriveKey/CryptDecrypt), so the live test dictionary still cannot be read
+ * off disk. Raw messages are kept per result for the same reason.
  *
  * Behaviour is deliberately forgiving: an unmapped code passes through
  * unchanged, and the LIS then appends it as a new result row rather than
@@ -18,12 +34,12 @@
 
 /** code → canonical LIS name + unit. `aliases` cover punctuation/naming drift. */
 export const MAGLUMI_ASSAYS = [
-  /* Thyroid */
-  { code: 'TSH',       catalogName: 'TSH',                    unit: 'µIU/mL', aliases: ['TSH2', 'TSH3'] },
-  { code: 'FT3',       catalogName: 'Free T3',                unit: 'pg/mL',  aliases: ['F-T3', 'FREET3'] },
-  { code: 'FT4',       catalogName: 'Free T4',                unit: 'ng/dL',  aliases: ['F-T4', 'FREET4'] },
-  { code: 'T3',        catalogName: 'Total T3',               unit: 'ng/mL',  aliases: ['TT3'] },
-  { code: 'T4',        catalogName: 'Total T4',               unit: 'µg/dL',  aliases: ['TT4'] },
+  /* Thyroid — names marked ✓ are confirmed present on this instrument */
+  { code: 'TSH',       catalogName: 'TSH',                    unit: 'µIU/mL', aliases: ['TSH2', 'TSH3', 'TSH II'] },       // ✓ assayid 587
+  { code: 'FT3',       catalogName: 'Free T3',                unit: 'pg/mL',  aliases: ['F-T3', 'FREET3', 'FT3 II'] },     // ✓ assayid 314
+  { code: 'FT4',       catalogName: 'Free T4',                unit: 'ng/dL',  aliases: ['F-T4', 'FREET4', 'FT4 II'] },     // ✓ assayid 315
+  { code: 'T3',        catalogName: 'Total T3',               unit: 'ng/mL',  aliases: ['TT3', 'TT3 II'] },                 // ✓
+  { code: 'T4',        catalogName: 'Total T4',               unit: 'µg/dL',  aliases: ['TT4', 'TT4 II'] },                 // ✓ assayid 313
   { code: 'TG',        catalogName: 'Thyroglobulin',          unit: 'ng/mL' },
   { code: 'TPOAB',     catalogName: 'Anti-TPO',               unit: 'IU/mL',  aliases: ['ANTI-TPO', 'A-TPO'] },
   { code: 'TGAB',      catalogName: 'Anti-Tg',                unit: 'IU/mL',  aliases: ['ANTI-TG', 'A-TG'] },
@@ -35,7 +51,9 @@ export const MAGLUMI_ASSAYS = [
   { code: 'E2',        catalogName: 'Estradiol',              unit: 'pg/mL',  aliases: ['ESTRADIOL'] },
   { code: 'PROG',      catalogName: 'Progesterone',           unit: 'ng/mL',  aliases: ['PRGE', 'P4'] },
   { code: 'TESTO',     catalogName: 'Testosterone',           unit: 'ng/mL',  aliases: ['TESTOSTERONE', 'TSTO'] },
-  { code: 'HCG',       catalogName: 'Beta hCG',               unit: 'mIU/mL', aliases: ['B-HCG', 'BHCG', 'β-HCG', 'HCG+B'] },
+  // ✓ present as "T-B HCG II" — total + beta hCG on this instrument
+  { code: 'HCG',       catalogName: 'Beta hCG',               unit: 'mIU/mL', aliases: ['B-HCG', 'BHCG', 'β-HCG', 'HCG+B', 'T-B HCG II', 'T-B HCG', 'TBHCG'] },
+  { code: 'PRA',       catalogName: 'Plasma Renin Activity',  unit: 'ng/mL/h' },                                            // ✓
   { code: 'AMH',       catalogName: 'AMH',                    unit: 'ng/mL' },
   { code: 'SHBG',      catalogName: 'SHBG',                   unit: 'nmol/L' },
   { code: 'DHEAS',     catalogName: 'DHEA-S',                 unit: 'µg/dL',  aliases: ['DHEA-S'] },
@@ -64,7 +82,7 @@ export const MAGLUMI_ASSAYS = [
   { code: 'IL6',       catalogName: 'IL-6',                   unit: 'pg/mL',  aliases: ['IL-6'] },
 
   /* Metabolic, bone, adrenal */
-  { code: '25OHVD',    catalogName: 'Vitamin D (25-OH)',      unit: 'ng/mL',  aliases: ['25-OH-VD', '25OH-VD', 'VITD', 'VD'] },
+  { code: '25OHVD',    catalogName: 'Vitamin D (25-OH)',      unit: 'ng/mL',  aliases: ['25-OH-VD', '25OH-VD', 'VITD', 'VD', '25-OH VD II', '25-OH VD'] }, // ✓
   { code: 'PTH',       catalogName: 'Parathyroid Hormone',    unit: 'pg/mL' },
   { code: 'INS',       catalogName: 'Insulin',                unit: 'µIU/mL', aliases: ['INSULIN'] },
   { code: 'CP',        catalogName: 'C-Peptide',              unit: 'ng/mL',  aliases: ['C-P', 'C-PEPTIDE'] },
@@ -75,8 +93,15 @@ export const MAGLUMI_ASSAYS = [
 
   /* Anaemia panel */
   { code: 'FER',       catalogName: 'Ferritin',               unit: 'ng/mL',  aliases: ['FERRITIN'] },
-  { code: 'VB12',      catalogName: 'Vitamin B12',            unit: 'pg/mL',  aliases: ['VITB12', 'B12'] },
+  { code: 'VB12',      catalogName: 'Vitamin B12',            unit: 'pg/mL',  aliases: ['VITB12', 'B12', 'Vit B12 II', 'Vit B12'] }, // ✓
   { code: 'FOL',       catalogName: 'Folate',                 unit: 'ng/mL',  aliases: ['FOLATE', 'FA'] },
+
+  /* Immunoglobulins — this instrument carries serum and urine variants, which
+   * are separate results and must not collapse onto one catalogue name. */
+  { code: 'IGAS',      catalogName: 'IgA (Serum)',            unit: 'g/L',    aliases: ['IgA(S)', 'IgA-(S)'] },   // ✓
+  { code: 'IGAU',      catalogName: 'IgA (Urine)',            unit: 'mg/L',   aliases: ['IgA(U)', 'IgA-(U)'] },   // ✓
+  { code: 'IGGS',      catalogName: 'IgG (Serum)',            unit: 'g/L',    aliases: ['IgG(S)', 'IgG-(S)'] },   // ✓
+  { code: 'IGGU',      catalogName: 'IgG (Urine)',            unit: 'mg/L',   aliases: ['IgG(U)', 'IgG-(U)'] },   // ✓
 
   /* Infectious disease */
   { code: 'HBSAG',     catalogName: 'HBsAg',                  unit: 'IU/mL',  aliases: ['HBS-AG'] },
@@ -96,13 +121,25 @@ for (const a of MAGLUMI_ASSAYS) {
   }
 }
 
-/** Fold case, punctuation and Greek beta so "β-hCG", "b-hcg" and "BHCG" all match. */
+/**
+ * Fold case, punctuation and Greek beta so "β-hCG", "b-hcg" and "BHCG" all match.
+ *
+ * Also drops a trailing generation marker. This instrument's assay menu is
+ * "TSH II", "FT3 II", "25-OH VD II" and so on — Snibe's second-generation kits —
+ * and without stripping that suffix every single assay on it failed to resolve,
+ * which is exactly what happened before this line existed. Stripping it means a
+ * future "III" kit keeps working too, instead of silently falling back to the
+ * instrument's own label.
+ */
 function normalise(token) {
-  return String(token)
+  const folded = String(token)
     .toUpperCase()
     .replace(/Β/g, 'B')      // Greek capital beta
     .replace(/ß/giu, 'B')
     .replace(/[\s_+.\-/()]/g, '');
+  // Only strip when something identifiable remains, so a code that IS "II" survives.
+  const stripped = folded.replace(/(III|II)$/, '');
+  return stripped.length >= 2 ? stripped : folded;
 }
 
 /** Resolve an instrument-reported assay code, or null when we have no entry. */

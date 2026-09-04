@@ -365,3 +365,59 @@ describe('buildHl7OrderResponse', () => {
     expect(back.specimenId).toBe('SP2026001');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * The site's real assay menu
+ *
+ * Names taken from the analyzer's own assay definitions (Maglumi 800/assay/*.asy)
+ * and its calibration history. These are second-generation kits, so every name
+ * carries a " II" suffix — which the original brochure-derived table missed
+ * entirely, meaning no assay on this instrument resolved at all.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('assay names as this instrument actually reports them', () => {
+  it.each([
+    ['TSH II',       'TSH'],
+    ['FT3 II',       'Free T3'],
+    ['FT4 II',       'Free T4'],
+    ['TT3 II',       'Total T3'],
+    ['TT4 II',       'Total T4'],
+    ['25-OH VD II',  'Vitamin D (25-OH)'],
+    ['Vit B12 II',   'Vitamin B12'],
+    ['T-B HCG II',   'Beta hCG'],
+    ['PRA',          'Plasma Renin Activity'],
+  ])('maps %s to %s', (reported, expected) => {
+    expect(resolveAssay(reported)?.catalogName).toBe(expected);
+  });
+
+  it('keeps serum and urine immunoglobulins apart', () => {
+    // Collapsing these onto one name would file a urine result against a serum test.
+    expect(resolveAssay('IgA(S)').catalogName).toBe('IgA (Serum)');
+    expect(resolveAssay('IgA(U)').catalogName).toBe('IgA (Urine)');
+    expect(resolveAssay('IgG(S)').catalogName).toBe('IgG (Serum)');
+    expect(resolveAssay('IgG(U)').catalogName).toBe('IgG (Urine)');
+  });
+
+  it('treats the older hyphenated variants as the same assay', () => {
+    expect(resolveAssay('IgA-(S)').catalogName).toBe('IgA (Serum)');
+    expect(resolveAssay('IgG-(U)').catalogName).toBe('IgG (Urine)');
+  });
+
+  it('would also match a future third-generation kit', () => {
+    expect(resolveAssay('TSH III')?.catalogName).toBe('TSH');
+  });
+
+  it('still matches the plain codes, so nothing regressed', () => {
+    expect(resolveAssay('TSH').catalogName).toBe('TSH');
+    expect(resolveAssay('FT4').catalogName).toBe('Free T4');
+    expect(resolveAssay('CA19-9').catalogName).toBe('CA 19-9');
+  });
+
+  it('leaves the optical/system checks unmapped rather than inventing names', () => {
+    for (const item of ['BGW', 'LC-le', 'LC-ri']) {
+      expect(resolveAssay(item)).toBeNull();
+      // Unmapped still means delivered, just under the instrument's own label.
+      expect(applyMaglumiAssayMap([{ code: item, value: '1' }])[0].code).toBe(item);
+    }
+  });
+});
