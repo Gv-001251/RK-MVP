@@ -37,11 +37,12 @@
       "watchdogMs": 0
     },
     {
+      "_note": "protocol 'auto' because the instrument's dialect is set on its control PC, not here: its own Lis.exe carries a hardcoded ASTM E1394-97 header record, yet it ships NIIHL7.dll beside NIIASTM.dll. The listener works out which from the first packet rather than betting on one and parsing nothing.",
       "id": "maglumi800",
       "name": "Snibe Maglumi 800 (Immunoassay)",
       "transport": "tcp-server",
       "port": 2576,
-      "protocol": "hl7",
+      "protocol": "auto",
       "framing": "auto",
       "ack": false,
       "assayMap": "maglumi",

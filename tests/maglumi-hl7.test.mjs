@@ -21,6 +21,9 @@ import {
   detectHl7Query, buildHl7OrderResponse,
 } from '../tools/lis-bridge/lib/hl7.mjs';
 import { resolveAssay, applyMaglumiAssayMap } from '../tools/lis-bridge/lib/maglumi-assays.mjs';
+import {
+  sniffProtocol, createConnectionHandler, parseMessage, detectQuery, buildOrderResponse,
+} from '../tools/lis-bridge/lib/protocol.mjs';
 
 const CR = '\r';
 
@@ -419,5 +422,84 @@ describe('assay names as this instrument actually reports them', () => {
       // Unmapped still means delivered, just under the instrument's own label.
       expect(applyMaglumiAssayMap([{ code: item, value: '1' }])[0].code).toBe(item);
     }
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Protocol auto-detection
+ *
+ * The Maglumi's dialect is chosen on its control PC, not here: its Lis.exe holds
+ * a hardcoded ASTM E1394-97 header record, yet NIIHL7.dll sits beside NIIASTM.dll.
+ * So one listener has to accept either, decided from the first packet.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('sniffProtocol', () => {
+  const buf = (s) => Buffer.from(s, 'latin1');
+
+  it('recognises HL7 by its MLLP start block', () => {
+    expect(sniffProtocol(Buffer.concat([Buffer.from([0x0b]), buf('MSH|^~\\&|')]))).toBe('hl7');
+  });
+
+  it('recognises unframed HL7 by the MSH segment', () => {
+    expect(sniffProtocol(buf('MSH|^~\\&|P1^Maglumi'))).toBe('hl7');
+  });
+
+  it('recognises HP-Socket PACK framing as HL7', () => {
+    const body = buf('MSH|^~\\&|x');
+    const head = Buffer.alloc(4); head.writeUInt32BE(body.length, 0);
+    expect(sniffProtocol(Buffer.concat([head, body]))).toBe('hl7');
+  });
+
+  it('recognises ASTM from the ENQ that opens the handshake', () => {
+    expect(sniffProtocol(Buffer.from([0x05]))).toBe('astm');
+  });
+
+  it('recognises ASTM from a framed record', () => {
+    expect(sniffProtocol(Buffer.from([0x02]))).toBe('astm');
+  });
+
+  it("recognises the ASTM header record Lis.exe actually builds", () => {
+    // Verbatim shape from the string embedded in Maglumi 800/Lis.exe.
+    expect(sniffProtocol(buf('H|\\^&||PSWD|Maglumi 1000|||||Lis||P|E1394-97|20100319'))).toBe('astm');
+  });
+
+  it('says "not yet" rather than guessing on an empty or ambiguous start', () => {
+    expect(sniffProtocol(Buffer.alloc(0))).toBeNull();
+    expect(sniffProtocol(buf('??'))).toBeNull();
+  });
+});
+
+describe('a single auto listener accepts either dialect', () => {
+  const machine = { id: 'maglumi800', protocol: 'auto', framing: 'auto', assayMap: 'maglumi' };
+
+  it('assembles an HL7 result arriving in MLLP', () => {
+    const seen = [];
+    const conn = createConnectionHandler(machine, { write: () => {}, onMessage: (t) => seen.push(t) });
+    conn.feed(mllp(MAGLUMI_ORU));
+    expect(seen).toHaveLength(1);
+    const parsed = parseMessage(machine, seen[0]);
+    expect(parsed.specimenId).toBe('SP2026001');
+    expect(parsed.tests[0].code).toBe('TSH');       // assay map still applied
+  });
+
+  it('answers the ASTM ENQ handshake on the same port', () => {
+    const written = [];
+    const conn = createConnectionHandler(machine, { write: (b) => written.push(...b) });
+    conn.feed(Buffer.from([0x05]));                 // ENQ
+    expect(written).toContain(0x06);                // ACK
+  });
+
+  it('stays silent until it knows which dialect it is hearing', () => {
+    const written = [];
+    const conn = createConnectionHandler(machine, { write: (b) => written.push(...b) });
+    conn.feed(Buffer.from('??', 'latin1'));         // undecidable
+    expect(written).toHaveLength(0);
+  });
+
+  it('routes an HL7 query to the HL7 responder even in auto mode', () => {
+    const q = detectQuery(machine, QBP_QUERY);
+    expect(q.isQuery).toBe(true);
+    const resp = buildOrderResponse(machine, { specimenId: 'SP2026001', tests: [{ code: 'TSH' }] }, q);
+    expect(resp.hl7).toContain('RSP^K11');
   });
 });
