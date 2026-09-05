@@ -503,3 +503,32 @@ describe('a single auto listener accepts either dialect', () => {
     expect(resp.hl7).toContain('RSP^K11');
   });
 });
+
+describe('telling the LIS port apart from the instrument control link', () => {
+  // Frame taken verbatim from the instrument's own log: "-->B2 04 00 08 D0 DC B2"
+  const internal = Buffer.from([0xb2, 0x04, 0x00, 0x08, 0xd0, 0xdc, 0xb2]);
+
+  it('recognises the internal mainboard link', () => {
+    expect(sniffProtocol(internal)).toBe('instrument-link');
+  });
+
+  it('does not mistake ASTM or HL7 for it', () => {
+    expect(sniffProtocol(Buffer.from([0x05]))).toBe('astm');
+    expect(sniffProtocol(Buffer.from('MSH|^~\\&|', 'latin1'))).toBe('hl7');
+  });
+
+  it('writes NOTHING back to a live instrument control link', () => {
+    // Sending ENQ/ACK into the analyzer's own control channel is the one thing
+    // worth being certain we never do.
+    const written = [];
+    const logs = [];
+    const conn = createConnectionHandler(
+      { id: 'maglumi800', protocol: 'auto' },
+      { write: (b) => written.push(...b), onLog: (m) => logs.push(m) },
+    );
+    conn.feed(internal);
+    conn.feed(internal);
+    expect(written).toHaveLength(0);
+    expect(logs.filter((l) => /INTERNAL mainboard link/.test(l))).toHaveLength(1); // warned once
+  });
+});

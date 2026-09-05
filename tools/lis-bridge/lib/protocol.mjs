@@ -29,6 +29,29 @@ function isAuto(machine) {
 }
 
 /**
+ * Is this the analyzer's INTERNAL mainboard link rather than its LIS port?
+ *
+ * The Maglumi has two serial connections and they are easy to confuse. Its own
+ * operational log shows the internal one carrying short binary frames led by
+ * 0xB2, e.g. "-->B2 04 00 08 D0 DC B2" — pipetting, incubator and cuvette
+ * commands between the control PC and the instrument mainboard. It is not ASTM,
+ * it is not HL7, and it is already owned by the control PC.
+ *
+ * Recognising it matters for two reasons: parsing it as ASTM produces confusing
+ * garbage, and writing an ENQ/ACK into a live instrument control link is
+ * something to avoid rather than discover. So it gets its own verdict and the
+ * caller stays silent.
+ */
+export function looksLikeInstrumentLink(buf) {
+  if (!buf || buf.length < 2) return false;
+  if (buf[0] !== 0xb2) return false;
+  // Mostly non-printable, which distinguishes it from any text-based protocol.
+  const sample = buf.subarray(0, Math.min(buf.length, 16));
+  const printable = sample.filter((v) => v >= 0x20 && v <= 0x7e).length;
+  return printable / sample.length < 0.5;
+}
+
+/**
  * Decide from the opening bytes whether a connection is speaking ASTM or HL7.
  *
  * Returns 'astm', 'hl7', or null meaning "not enough to be sure yet".
@@ -44,6 +67,7 @@ export function sniffProtocol(buf) {
   const b = buf[0];
   if (b === 0x0b) return 'hl7';                       // MLLP <VT>
   if (b === 0x05 || b === 0x02 || b === 0x04) return 'astm'; // ENQ / STX / EOT
+  if (looksLikeInstrumentLink(buf)) return 'instrument-link';
   const head = buf.subarray(0, 8).toString('latin1');
   if (/^MSH\|/.test(head)) return 'hl7';              // unframed HL7
   if (/^H\|/.test(head)) return 'astm';               // unframed ASTM header record
@@ -81,6 +105,19 @@ class AutoProtocolReceiver {
     this.bytesSeen += buf.length;
     const combined = Buffer.concat(this.pending);
     const decided = sniffProtocol(combined);
+
+    // Wrong cable: this is the instrument's internal control link. Say so once,
+    // then ignore the stream — do not parse it and above all do not write to it.
+    if (decided === 'instrument-link') {
+      if (!this.warnedInstrumentLink) {
+        this.warnedInstrumentLink = true;
+        this.cbs.onLog?.('✗ this looks like the analyzer\'s INTERNAL mainboard link '
+          + '(binary frames led by 0xB2), not its LIS port. Nothing will be parsed and '
+          + 'nothing will be sent. Move the cable to a spare COM port on the control PC.');
+      }
+      this.pending = [];
+      return;
+    }
 
     if (!decided) {
       // Give up guessing after a while and default to ASTM, which is what this
